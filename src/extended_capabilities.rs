@@ -20,7 +20,7 @@
 //! - [x] [Vendor-Specific Extended Capability](VendorSpecificExtendedCapability) (VSEC) (000Bh)
 //! - [ ] Configuration Access Correlation (CAC) (000Ch)
 //! - [ ] Access Control Services (ACS) (000Dh)
-//! - [ ] Alternative Routing-ID Interpretation (ARI) (000Eh)
+//! - [x] [Alternative Routing-ID Interpretation](alternative_routing_id_interpolation) (ARI) (000Eh)
 //! - [x] [Address Translation Services](AddressTranslationServices) (ATS) (000Fh)
 //! - [ ] Single Root I/O Virtualization (SR-IOV) (0010h)
 //! - [ ] Multi-Root I/O Virtualization (MR-IOV) (0011h)
@@ -117,7 +117,7 @@ impl<'a> Iterator for ExtendedCapabilities<'a> {
             0x000B => VendorSpecificExtendedCapability(bytes.read_with(ecs_offset, LE).ok()?),
             0x000C => ConfigurationAccessCorrelation,
             0x000D => AccessControlServices(bytes.read_with(ecs_offset, LE).ok()?),
-            0x000E => AlternativeRoutingIdInterpretation,
+            0x000E => AlternativeRoutingIdInterpretation(bytes.read_with(ecs_offset, LE).ok()?),
             0x000F => AddressTranslationServices(bytes.read_with(ecs_offset, LE).ok()?),
             0x0010 => SingleRootIoVirtualization,
             0x0011 => MultiRootIoVirtualization,
@@ -126,7 +126,7 @@ impl<'a> Iterator for ExtendedCapabilities<'a> {
             0x0014 => AmdReserved,
             0x0015 => ResizableBar,
             0x0016 => DynamicPowerAllocation,
-            0x0017 => TphRequester,
+            0x0017 => TphRequester(bytes.read_with(ecs_offset, LE).ok()?),
             0x0018 => LatencyToleranceReporting(bytes.read_with(ecs_offset, LE).ok()?),
             0x0019 => SecondaryPciExpress(bytes.read_with(ecs_offset, LE).ok()?),
             0x001A => ProtocolMultiplexing,
@@ -180,7 +180,7 @@ impl<'a> ExtendedCapability<'a> {
             ExtendedCapabilityKind::VendorSpecificExtendedCapability(_) => 0x000B,
             ExtendedCapabilityKind::ConfigurationAccessCorrelation => 0x000C,
             ExtendedCapabilityKind::AccessControlServices(_) => 0x000D,
-            ExtendedCapabilityKind::AlternativeRoutingIdInterpretation => 0x000E,
+            ExtendedCapabilityKind::AlternativeRoutingIdInterpretation(_) => 0x000E,
             ExtendedCapabilityKind::AddressTranslationServices(_) => 0x000F,
             ExtendedCapabilityKind::SingleRootIoVirtualization => 0x0010,
             ExtendedCapabilityKind::MultiRootIoVirtualization => 0x0011,
@@ -189,7 +189,7 @@ impl<'a> ExtendedCapability<'a> {
             ExtendedCapabilityKind::AmdReserved => 0x0014,
             ExtendedCapabilityKind::ResizableBar => 0x0015,
             ExtendedCapabilityKind::DynamicPowerAllocation => 0x0016,
-            ExtendedCapabilityKind::TphRequester => 0x0017,
+            ExtendedCapabilityKind::TphRequester(_) => 0x0017,
             ExtendedCapabilityKind::LatencyToleranceReporting(_) => 0x0018,
             ExtendedCapabilityKind::SecondaryPciExpress(_) => 0x0019,
             ExtendedCapabilityKind::ProtocolMultiplexing => 0x001A,
@@ -249,7 +249,7 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Access Control Services (ACS)
     AccessControlServices(AccessControlServices<'a>),
     /// Alternative Routing-ID Interpretation (ARI)
-    AlternativeRoutingIdInterpretation,
+    AlternativeRoutingIdInterpretation(AlternativeRoutingIdInterpretation),
     /// Address Translation Services (ATS)
     AddressTranslationServices(AddressTranslationServices),
     /// Single Root I/O Virtualization (SR-IOV) 
@@ -268,7 +268,7 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Dynamic Power Allocation (DPA)
     DynamicPowerAllocation,
     /// TPH Requester
-    TphRequester,
+    TphRequester(TphRequester<'a>),
     /// Latency Tolerance Reporting (LTR)
     LatencyToleranceReporting(LatencyToleranceReporting),
     /// Secondary PCI Express
@@ -315,7 +315,7 @@ pub enum ExtendedCapabilityKind<'a> {
 }
 
 // 0001h Advanced Error Reporting (AER)
-mod advanced_error_reporting;
+pub mod advanced_error_reporting;
 pub use advanced_error_reporting::AdvancedErrorReporting;
 
 // 0002h Virtual Channel (VC)
@@ -323,51 +323,59 @@ pub mod virtual_channel;
 pub use virtual_channel::VirtualChannel;
 
 // 0003h Device Serial Number
-mod device_serial_number;
+pub mod device_serial_number;
 pub use device_serial_number::DeviceSerialNumber;
 
 // 0004h Power Budgeting
-mod power_budgeting;
+pub mod power_budgeting;
 pub use power_budgeting::PowerBudgeting;
 
 // 000Bh Vendor-Specific Extended Capability (VSEC)
-mod vendor_specific_extended_capability;
-pub use vendor_specific_extended_capability::{VendorSpecificExtendedCapability, VsecHeader};
+pub mod vendor_specific_extended_capability;
+pub use vendor_specific_extended_capability::VendorSpecificExtendedCapability;
 
 // 000Dh Access Control Services (ACS) 
-mod access_control_services;
+pub mod access_control_services;
 pub use access_control_services::{AccessControlServices, EgressControlVectors};
 
+// 000Eh Alternative Routing-ID Interpretation (ARI)
+pub mod alternative_routing_id_interpolation;
+pub use alternative_routing_id_interpolation::AlternativeRoutingIdInterpretation;
+
 // 000Fh Address Translation Services (ATS)
-mod address_translation_services;
+pub mod address_translation_services;
 pub use address_translation_services::AddressTranslationServices;
 
 // 0013h Page Request Interface (PRI)
-mod page_request_interface;
+pub mod page_request_interface;
 pub use page_request_interface::PageRequestInterface;
 
+// 0017h TPH Requester
+pub mod tph_requester;
+pub use tph_requester::TphRequester;
+
 // 0018h Latency Tolerance Reporting (LTR)
-mod latency_tolerance_reporting;
+pub mod latency_tolerance_reporting;
 pub use latency_tolerance_reporting::LatencyToleranceReporting;
 
 // 0019h Secondary PCI Express
-mod secondary_pci_express;
+pub mod secondary_pci_express;
 pub use secondary_pci_express::SecondaryPciExpress;
 
 // 001Bh Process Address Space ID (PASID)
-mod process_address_space_id;
+pub mod process_address_space_id;
 pub use process_address_space_id::ProcessAddressSpaceId;
 
 // 001Dh Downstream Port Containment (DPC) 
-mod downstream_port_containment;
+pub mod downstream_port_containment;
 pub use downstream_port_containment::DownstreamPortContainment;
 
 // 001Eh L1 PM Substates
-mod l1_pm_substates;
+pub mod l1_pm_substates;
 pub use l1_pm_substates::L1PmSubstates;
 
 // 001Fh Precision Time Measurement (PTM) 
-mod precision_time_measurement;
+pub mod precision_time_measurement;
 pub use precision_time_measurement::PrecisionTimeMeasurement;
 
 

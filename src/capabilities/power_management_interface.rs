@@ -3,6 +3,7 @@
 //! This capability structure provides a standard interface to control power management features in
 //! a PCI device. It is fully documented in the PCI Power Management Interface Specification.
 
+
 use modular_bitfield::prelude::*;
 use displaydoc::Display as DisplayDoc;
 use byte::{
@@ -20,8 +21,35 @@ pub struct PowerManagementInterface {
     pub capabilities: Capabilities,
     pub control: Control,
     pub bridge: Bridge,
-    pub data: Option<Data>,
+    data: u8,
 }
+
+impl PowerManagementInterface {
+    pub fn data(&self) -> Option<Data> {
+        if self.data == 0 {
+            None
+        } else {
+            Some(Data {
+                value: self.data,
+                select: self.control.data_select,
+                scale: self.control.data_scale,
+            })
+        }
+    }
+}
+impl<'a> TryRead<'a, Endian> for PowerManagementInterface {
+    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
+        let offset = &mut 0;
+        let pmi = PowerManagementInterface {
+            capabilities: bytes.read_with::<u16>(offset, endian)?.into(),
+            control: bytes.read_with::<u16>(offset, endian)?.into(),
+            bridge: bytes.read_with::<u8>(offset, endian)?.into(),
+            data: bytes.read_with::<u8>(offset, endian)?,
+        };
+        Ok((pmi, *offset))
+    }
+}
+
 
 
 #[bitfield(bits = 16)]
@@ -128,14 +156,11 @@ pub struct PmeSupport {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct ControlProto {
-    #[bits = 2]
-    power_state: PowerState,
+    power_state: B2,
     reserved: B6,
     pme_enabled: bool,
-    #[bits = 4]
-    data_select: DataSelect,
-    #[bits = 2]
-    data_scale: DataScale,
+    data_select: B4,
+    data_scale: B2,
     pme_status: bool,
 }
 
@@ -149,18 +174,21 @@ pub struct Control {
     pub no_soft_reset: bool,
     /// Enables the function to assert PME#.
     pub pme_enabled: bool,
+    pub data_select: DataSelect,
+    pub data_scale: DataScale,
     /// This bit is set when the function would normally assert the PME# signal independent of the
     /// state of the [Control.pme_enabled] bit.
     pub pme_status: bool,
 }
-
 impl From<ControlProto> for Control {
     fn from(proto: ControlProto) -> Self {
         Self {
-            power_state: proto.power_state(),
+            power_state: proto.power_state().into(),
             reserved: proto.reserved(),
             no_soft_reset: ((proto.reserved() << 2) & 0x0008) != 0,
             pme_enabled: proto.pme_enabled(),
+            data_select: proto.data_select().into(),
+            data_scale: proto.data_scale().into(),
             pme_status: proto.pme_status(),
         }
     }
@@ -170,13 +198,23 @@ impl From<u16> for Control {
 }
 
 /// Current power state.
-#[derive(BitfieldSpecifier, Debug, Clone, Copy, PartialEq, Eq)]
-#[bits = 2]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerState {
     D0,
     D1,
     D2,
     D3Hot,
+}
+impl From<u8> for PowerState {
+    fn from(byte: u8) -> Self {
+        match byte {
+            0b00 => Self::D0,
+            0b01 => Self::D1,
+            0b10 => Self::D2,
+            0b11 => Self::D3Hot,
+            _ => unreachable!(),
+        }
+    }
 }
 
 
@@ -227,8 +265,7 @@ pub struct Data {
 }
 
 /// Used to select which data is to be reported through the [Data] register and [DataScale].
-#[derive(BitfieldSpecifier, Debug, Clone, Copy, PartialEq, Eq)]
-#[bits = 4]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataSelect {
     /// D0 Power Consumed
     PowerConsumedD0,
@@ -249,12 +286,43 @@ pub enum DataSelect {
     /// Common logic power consumption
     CommonLogic,
     /// TBD
-    Reserved,
+    Reserved(u8),
+}
+impl From<u8> for DataSelect {
+    fn from(byte: u8) -> Self {
+        match byte {
+            0 => Self::PowerConsumedD0,
+            1 => Self::PowerConsumedD1,
+            2 => Self::PowerConsumedD2,
+            3 => Self::PowerConsumedD3,
+            4 => Self::PowerDissipatedD0,
+            5 => Self::PowerDissipatedD1,
+            6 => Self::PowerDissipatedD2,
+            7 => Self::PowerDissipatedD3,
+            8 => Self::CommonLogic,
+            v => Self::Reserved(v),
+        }
+    }
+}
+impl From<DataSelect> for u8 {
+    fn from(data: DataSelect) -> Self {
+        match data {
+            DataSelect::PowerConsumedD0   => 0,
+            DataSelect::PowerConsumedD1   => 1,
+            DataSelect::PowerConsumedD2   => 2,
+            DataSelect::PowerConsumedD3   => 3,
+            DataSelect::PowerDissipatedD0 => 4,
+            DataSelect::PowerDissipatedD1 => 5,
+            DataSelect::PowerDissipatedD2 => 6,
+            DataSelect::PowerDissipatedD3 => 7,
+            DataSelect::CommonLogic       => 8,
+            DataSelect::Reserved(v)       => v,
+        }
+    }
 }
 
 /// Scaling factor indicated to arrive at the value for the desired measurement.
-#[derive(BitfieldSpecifier, Debug, Clone, Copy, PartialEq, Eq)]
-#[bits = 2]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataScale {
     Unknown,
     /// 0.1x
@@ -264,31 +332,18 @@ pub enum DataScale {
     /// 0.001x
     Thousandth,
 }
-
-
-impl<'a> TryRead<'a, Endian> for PowerManagementInterface {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let capabilities = bytes.read_with::<u16>(offset, endian)?.into();
-        let control_proto = ControlProto::from(bytes.read_with::<u16>(offset, endian)?);
-        let bridge = bytes.read_with::<u8>(offset, endian)?.into();
-        let data = {
-            let value = bytes.read_with::<u8>(offset, endian)?;
-            (value != 0).then(|| Data { 
-                value,
-                select: control_proto.data_select(),
-                scale: control_proto.data_scale(),
-            })
-        };
-        let pmi = PowerManagementInterface {
-            capabilities,
-            control: control_proto.into(),
-            bridge,
-            data,
-        };
-        Ok((pmi, *offset))
+impl From<u8> for DataScale {
+    fn from(byte: u8) -> Self {
+        match byte {
+            0b00 => Self::Unknown,
+            0b01 => Self::Tenth,
+            0b10 => Self::Hundredth,
+            0b11 => Self::Thousandth,
+            _ => unreachable!(),
+        }
     }
 }
+
 
 
 #[cfg(test)]
@@ -326,6 +381,8 @@ mod tests {
                 reserved: 0b000000,
                 no_soft_reset: false,
                 pme_enabled: false,
+                data_select: DataSelect::PowerConsumedD0,
+                data_scale: DataScale::Unknown,
                 pme_status: false,
             },
             bridge: Bridge {
@@ -333,7 +390,7 @@ mod tests {
                 b2_b3: true,
                 bpcc_enabled: false,
             },
-            data: None,
+            data: 0,
         };
         assert_eq!(sample, result);
     }

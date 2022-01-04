@@ -4,25 +4,25 @@
 //!
 //! Capabilities list
 //! - [x] Null Capability (00h)
-//! - [x] PCI Power Management Interface (01h)
+//! - [x] [PCI Power Management Interface](power_management_interface) (01h)
 //! - [ ] AGP (02h)
-//! - [ ] VPD (03h)
+//! - [x] [VPD](vital_product_data) (03h)
 //! - [ ] Slot Identification (04h)
-//! - [x] Message Signaled Interrupts (05h)
+//! - [x] [Message Signaled Interrupts](message_signaled_interrups) (05h)
 //! - [ ] CompactPCI Hot Swap (06h)
 //! - [ ] PCI-X (07h)
-//! - [ ] HyperTransport (08h)
-//! - [x] Vendor Specific (09h)
+//! - [x] [HyperTransport](Hypertransport) (08h)
+//! - [x] [Vendor Specific](vendor_specific) (09h)
 //! - [ ] Debug port (0Ah)
 //! - [ ] CompactPCI central resource control (0Bh)
 //! - [ ] PCI Hot-Plug (0Ch)
 //! - [ ] PCI Bridge Subsystem Vendor ID (0Dh)
 //! - [ ] AGP 8x (0Eh)
 //! - [ ] Secure Device (0Fh)
-//! - [ ] PCI Express (10h)
-//! - [ ] MSI-X (11h)
-//! - [ ] Serial ATA Data/Index Configuration (12h)
-//! - [ ] Advanced Features (AF) (13h)
+//! - [x] [PCI Express](pci_express) (10h)
+//! - [x] [MSI-X](msi_x) (11h)
+//! - [x] [Serial ATA Data/Index Configuration](sata) (12h)
+//! - [x] [Advanced Features](advanced_features) (AF) (13h)
 //! - [ ] Enhanced Allocation (14h)
 //! - [ ] Flattening Portal Bridge (15h)
 //! 
@@ -37,26 +37,72 @@ use byte::{
 
 use super::DDR_OFFSET;
 
+/// Each capability in the capability list consists of an 8-bit ID field assigned by the PCI SIG,
+/// an 8 bit pointer in configuration space to the next capability.
+pub const CAP_HEADER_LEN: usize = 2;
+
+// 01h PCI Power Management Interface
 pub mod power_management_interface;
 pub use power_management_interface::PowerManagementInterface;
 
-pub mod vendor_specific;
-pub use vendor_specific::VendorSpecific;
+// 02h AGP
 
-pub mod bridge_subsystem_vendor_id;
-pub use bridge_subsystem_vendor_id::BridgeSubsystemVendorId;
+// 03h VPD
+pub mod vital_product_data;
+pub use vital_product_data::VitalProductData;
 
+// 04h Slot Identification
+
+// 05h Message Signaled Interrupts
 pub mod message_signaled_interrups;
 pub use message_signaled_interrups::MessageSignaledInterrups;
 
+// 06h CompactPCI Hot Swap
+
+// 07h PCI-X
+
+// 08h HyperTransport
+pub mod hypertransport;
+pub use hypertransport::Hypertransport;
+
+// 09h Vendor Specific
+pub mod vendor_specific;
+pub use vendor_specific::VendorSpecific;
+
+// 0Ah Debug port
+
+// 0Bh CompactPCI central resource control
+
+// 0Ch PCI Hot-Plug
+
+// 0Dh PCI Bridge Subsystem Vendor ID
+pub mod bridge_subsystem_vendor_id;
+pub use bridge_subsystem_vendor_id::BridgeSubsystemVendorId;
+
+// 0Eh AGP 8x
+
+// 0Fh Secure Device
+
+// 10h PCI Express
 pub mod pci_express;
 pub use pci_express::PciExpress;
 
+// 11h MSI-X
 pub mod msi_x;
 pub use msi_x::MsiX;
 
+// 12h Serial ATA Data/Index Configuration
+pub mod sata;
+pub use sata::Sata;
+
+// 13h Advanced Features (AF)
 pub mod advanced_features;
 pub use advanced_features::AdvancedFeatures;
+
+// 14h Enhanced Allocation
+
+// 15h Flattening Portal Bridge
+
 
 
 /// An iterator through *Capabilities List*
@@ -73,15 +119,6 @@ impl<'a> Capabilities<'a> {
     pub fn new(data: &'a [u8], pointer: u8) -> Self {
         Self { data, pointer }
     }
-    fn offset(&self) -> Option<usize> {
-        (self.pointer as usize).checked_sub(DDR_OFFSET)
-    }
-    fn cap_id(&self) -> Option<u8> {
-        self.data.get(self.offset()?).cloned()
-    }
-    fn next_pointer(&self) -> Option<u8> {
-        self.data.get(self.offset()? + 1).cloned()
-    }
 }
 impl<'a> Iterator for Capabilities<'a> {
     type Item = Capability<'a>;
@@ -89,45 +126,31 @@ impl<'a> Iterator for Capabilities<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         // Stop iterating if next pointer is null
         if self.pointer == 0 {
-            None
-        } else {
-            let data = &self.data;
-            let start = self.offset()? + 2;
-            let kind = match self.cap_id()? {
-                0x01 => {
-                    let pmi = data.read_with(&mut start.clone(), LE).ok()?;
-                    CapabilityKind::PowerManagementInterface(pmi)
-                },
-                0x05 => {
-                    let msi = data.read_with(&mut start.clone(), LE).ok()?;
-                    CapabilityKind::MessageSignaledInterrups(msi)
-                },
-                0x09 => {
-                    let vs = data.read_with(&mut start.clone(), LE).ok()?;
-                    CapabilityKind::VendorSpecific(vs)
-                },
-                0x0d => {
-                    let bsv = data.read_with(&mut start.clone(), LE).ok()?;
-                    CapabilityKind::BridgeSubsystemVendorId(bsv)
-                },
-                0x10 => {
-                    let pcie = data.read_with(&mut start.clone(), LE).ok()?;
-                    CapabilityKind::PciExpress(pcie)
-                },
-                0x11 => {
-                    let msix = data.read_with(&mut start.clone(), LE).ok()?;
-                    CapabilityKind::MsiX(msix)
-                },
-                0x13 => {
-                    let af = data.read_with(&mut start.clone(), LE).ok()?;
-                    CapabilityKind::AdvancedFeatures(af)
-                },
-                v => CapabilityKind::Reserved(v),
-            };
-            let pointer = self.pointer;
-            self.pointer = self.next_pointer()?;
-            Some(Capability { pointer, kind })
+            return None;
         }
+        let pointer = self.pointer;
+        let data = &self.data;
+        // Capability data resides in Device dependent region (0x34 offset)
+        let offset = &mut usize::from(pointer).checked_sub(DDR_OFFSET)?;
+        // 8-bit ID field assigned by the PCI SIG
+        let cap_id = data.read_with::<u8>(offset, LE).ok()?;
+        // an 8 bit pointer in configuration space to the next capability
+        self.pointer = data.read_with::<u8>(offset, LE).ok()?;
+        let kind = match cap_id {
+            0x00 => CapabilityKind::NullCapability,
+            0x01 => data.read_with(offset, LE).map(CapabilityKind::PowerManagementInterface).ok()?,
+            0x03 => data.read_with(offset, LE).map(CapabilityKind::VitalProductData).ok()?,
+            0x05 => data.read_with(offset, LE).map(CapabilityKind::MessageSignaledInterrups).ok()?,
+            0x08 => data.read_with(offset, LE).map(CapabilityKind::Hypertransport).ok()?,
+            0x09 => data.read_with(offset, LE).map(CapabilityKind::VendorSpecific).ok()?,
+            0x0d => data.read_with(offset, LE).map(CapabilityKind::BridgeSubsystemVendorId).ok()?,
+            0x10 => data.read_with(offset, LE).map(CapabilityKind::PciExpress).ok()?,
+            0x11 => data.read_with(offset, LE).map(CapabilityKind::MsiX).ok()?,
+            0x12 => data.read_with(offset, LE).map(CapabilityKind::Sata).ok()?,
+            0x13 => data.read_with(offset, LE).map(CapabilityKind::AdvancedFeatures).ok()?,
+            v => CapabilityKind::Reserved(v),
+        };
+        Some(Capability { pointer, kind })
     }
 }
 
@@ -139,14 +162,19 @@ pub struct Capability<'a> {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum CapabilityKind<'a> {
+    /// Null Capability
+    ///
+    /// This capability contains no registers. It may be present in any Function. Functions may
+    /// contain multiple instances of this capability.
+    NullCapability,
     PowerManagementInterface(PowerManagementInterface),
     // AcceleratedGraphicsPort(AcceleratedGraphicsPort),
-    // VitalProductData(VitalProductData),
+    VitalProductData(VitalProductData),
     // SlotIndetification(SlotIndetification),
     MessageSignaledInterrups(MessageSignaledInterrups),
     // CompactPciHotSwap(CompactPciHotSwap),
     // PciX(PciX),
-    // HyperTransport(HyperTransport),
+    Hypertransport(Hypertransport),
     VendorSpecific(VendorSpecific<'a>),
     // DebugPort(DebugPort),
     // CompactPciResourceControl(CompactPciResourceControl),
@@ -156,6 +184,7 @@ pub enum CapabilityKind<'a> {
     // SecureDevice(SecureDevice),
     PciExpress(PciExpress),
     MsiX(MsiX),
+    Sata(Sata),
     AdvancedFeatures(AdvancedFeatures),
     Reserved(u8),
 }

@@ -42,12 +42,15 @@ impl<'a> TryRead<'a, Endian> for PciExpress {
         let link = bytes.read_with::<LinkOption>(offset, endian)?.0;
         let slot = bytes.read_with::<SlotOption>(offset, endian)?.0;
         let root = bytes.read_with::<RootOption>(offset, endian)?.0;
+        // Since PCI Express® Base Specification Revision 2
         let (device_2, link_2, slot_2) =
             if capabilities.version > 1 {
                 (
                     bytes.read_with::<Device2Option>(offset, endian)?.0,
                     bytes.read_with::<Link2Option>(offset, endian)?.0,
-                    bytes.read_with::<Slot2Option>(offset, endian)?.0,
+                    // lspci.c allowed to read data shorter than PCi Express capability header
+                    // bytes.read_with::<Slot2Option>(offset, endian)?.0,
+                    bytes.read_with::<Slot2Option>(offset, endian).unwrap_or(Slot2Option(None)).0,
                 )
             } else {
                 (None, None, None)
@@ -664,7 +667,7 @@ impl From<LinkCapabilities> for u32 {
 
 /// Max/Current/Target Link Speed
 /// Speeds should be taken from [SupportedLinkSpeedsVector]
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LinkSpeed {
     /// 2.5 GT/s
     Rate2GTps,
@@ -700,13 +703,13 @@ impl From<u8> for LinkSpeed {
 impl From<LinkSpeed> for u8 {
     fn from(data: LinkSpeed) -> Self {
         match data {
-            LinkSpeed::Rate2GTps   => 0,
-            LinkSpeed::Rate5GTps   => 1,
-            LinkSpeed::Rate8GTps   => 2,
-            LinkSpeed::Rate16GTps  => 3,
-            LinkSpeed::Rate32GTps  => 4,
-            LinkSpeed::Rate64GTps  => 5,
-            LinkSpeed::RateRsvdp   => 6,
+            LinkSpeed::Rate2GTps   => 1,
+            LinkSpeed::Rate5GTps   => 2,
+            LinkSpeed::Rate8GTps   => 3,
+            LinkSpeed::Rate16GTps  => 4,
+            LinkSpeed::Rate32GTps  => 5,
+            LinkSpeed::Rate64GTps  => 6,
+            LinkSpeed::RateRsvdp   => 7,
             LinkSpeed::Reserved(v) => v,
         }
     }
@@ -1394,9 +1397,9 @@ struct Device2Option(Option<Device2>);
 impl<'a> TryRead<'a, Endian> for Device2Option {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
-            let capabilities = bytes.read_with::<u32>(offset, endian)?;
-            let control = bytes.read_with::<u16>(offset, endian)?;
-            let status = bytes.read_with::<u16>(offset, endian)?;
+        let capabilities = bytes.read_with::<u32>(offset, endian)?;
+        let control = bytes.read_with::<u16>(offset, endian)?;
+        let status = bytes.read_with::<u16>(offset, endian)?;
         if (0, 0, 0) == (capabilities, control, status) {
             Ok((Self(None), *offset))
         } else {
@@ -1430,6 +1433,34 @@ pub struct DeviceCapabilities2Proto {
     emergency_power_reduction_initialization_required: bool,
     rsvdp: B4,
     frs_supported: bool,
+}
+impl<'a> From<&'a DeviceCapabilities2> for DeviceCapabilities2Proto {
+    fn from(data: &DeviceCapabilities2) -> Self {
+        Self::new()
+            .with_completion_timeout_ranges_supported(data.completion_timeout_ranges_supported.clone().into())
+            .with_completion_timeout_disable_supported(data.completion_timeout_disable_supported)
+            .with_ari_forwarding_supported(data.ari_forwarding_supported)
+            .with_atomic_op_routing_supported(data.atomic_op_routing_supported)
+            .with_u32_atomicop_completer_supported(data.u32_atomicop_completer_supported)
+            .with_u64_atomicop_completer_supported(data.u64_atomicop_completer_supported)
+            .with_u128_cas_completer_supported(data.u128_cas_completer_supported)
+            .with_no_ro_enabled_pr_pr_passing(data.no_ro_enabled_pr_pr_passing)
+            .with_ltr_mechanism_supported(data.ltr_mechanism_supported)
+            .with_tph_completer_supported(data.tph_completer_supported.clone().into())
+            .with_ln_system_cls(data.ln_system_cls.clone().into())
+            .with_support_10bit_tag_completer(data.support_10bit_tag_completer)
+            .with_support_10bit_tag_requester(data.support_10bit_tag_requester)
+            .with_obff_supported(data.obff_supported.clone().into())
+            .with_extended_fmt_field_supported(data.extended_fmt_field_supported)
+            .with_end_end_tlp_prefix_supported(data.end_end_tlp_prefix_supported)
+            .with_max_end_end_tlp_prefixes(data.max_end_end_tlp_prefixes.into())
+            .with_emergency_power_reduction_supported(data.emergency_power_reduction_supported.clone().into())
+            .with_emergency_power_reduction_initialization_required(
+                data.emergency_power_reduction_initialization_required
+            )
+            .with_rsvdp(0)
+            .with_frs_supported(data.frs_supported)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1506,6 +1537,9 @@ impl From<DeviceCapabilities2Proto> for DeviceCapabilities2 {
 impl From<u32> for DeviceCapabilities2 {
     fn from(dword: u32) -> Self { DeviceCapabilities2Proto::from(dword).into() }
 }
+impl<'a> From<&'a DeviceCapabilities2> for u32 {
+    fn from(data: &DeviceCapabilities2) -> Self { DeviceCapabilities2Proto::from(data).into() }
+}
 
 
 /// Indicates device Function support for the optional Completion Timeout programmability mechanism
@@ -1528,6 +1562,8 @@ pub enum CompletionTimeoutRanges {
     RangesBCD,
     /// Ranges A, B, C, and D 
     RangesABCD,
+    /// Reserved
+    Reserved(u8),
 }
 impl CompletionTimeoutRanges {
     pub const A: Range<f64> = 50e-6 .. 10e-3;
@@ -1546,7 +1582,22 @@ impl From<u8> for CompletionTimeoutRanges {
             0b0111 => Self::RangesABC,
             0b1110 => Self::RangesBCD,
             0b1111 => Self::RangesABCD,
-                _ => unreachable!(),
+                 v => Self::Reserved(v),
+        }
+    }
+}
+impl From<CompletionTimeoutRanges> for u8 {
+    fn from(data: CompletionTimeoutRanges) -> Self {
+        match data {
+            CompletionTimeoutRanges::NotSupported => 0b0000,
+            CompletionTimeoutRanges::RangeA       => 0b0001,
+            CompletionTimeoutRanges::RangeB       => 0b0010,
+            CompletionTimeoutRanges::RangesAB     => 0b0011,
+            CompletionTimeoutRanges::RangesBC     => 0b0110,
+            CompletionTimeoutRanges::RangesABC    => 0b0111,
+            CompletionTimeoutRanges::RangesBCD    => 0b1110,
+            CompletionTimeoutRanges::RangesABCD   => 0b1111,
+            CompletionTimeoutRanges::Reserved(v)  => v,
         }
     }
 }
@@ -1571,6 +1622,16 @@ impl From<u8> for TphCompleter {
             0b10 => Self::Reserved,          
             0b11 => Self::TphAndExtendedTph, 
                _ => unreachable!(),
+        }
+    }
+}
+impl From<TphCompleter> for u8 {
+    fn from(data: TphCompleter) -> Self {
+        match data {
+            TphCompleter::NotSupported      => 0b00,
+            TphCompleter::Tph               => 0b01,
+            TphCompleter::Reserved          => 0b10,
+            TphCompleter::TphAndExtendedTph => 0b11,
         }
     }
 }
@@ -1599,6 +1660,16 @@ impl From<u8> for LnSystemCls {
         }
     }
 }
+impl From<LnSystemCls> for u8 {
+    fn from(data: LnSystemCls) -> Self {
+        match data {
+            LnSystemCls::NotSupported      => 0b00,
+            LnSystemCls::Cachelines64Byte  => 0b01,
+            LnSystemCls::Cachelines128Byte => 0b10,
+            LnSystemCls::Reserved          => 0b11,
+        }
+    }
+}
 
 /// Indicates if OBFF is supported and, if so, what signaling mechanism is used
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1623,6 +1694,16 @@ impl From<u8> for Obff {
         }
     }
 }
+impl From<Obff> for u8 {
+    fn from(data: Obff) -> Self {
+        match data {
+            Obff::NotSupported   => 0b00,
+            Obff::Message        => 0b01,
+            Obff::Wake           => 0b10,
+            Obff::WakeAndMessage => 0b11,
+        }
+    }
+}
 
 /// Indicates the maximum number of End-End TLP Prefixes supported by this Function
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1644,6 +1725,16 @@ impl From<u8> for MaxEndEndTlpPrefixes {
             0b10 => Self::Max2,
             0b11 => Self::Max3,
                _ => unreachable!(),
+        }
+    }
+}
+impl From<MaxEndEndTlpPrefixes> for u8 {
+    fn from(data: MaxEndEndTlpPrefixes) -> Self {
+        match data {
+            MaxEndEndTlpPrefixes::Max4 => 0b00,
+            MaxEndEndTlpPrefixes::Max1 => 0b01,
+            MaxEndEndTlpPrefixes::Max2 => 0b10,
+            MaxEndEndTlpPrefixes::Max3 => 0b11,
         }
     }
 }
@@ -1673,6 +1764,16 @@ impl From<u8> for EmergencyPowerReduction {
         }
     }
 }
+impl From<EmergencyPowerReduction> for u8 {
+    fn from(data: EmergencyPowerReduction) -> Self {
+        match data {
+             EmergencyPowerReduction::NotSupported               => 0b00,
+             EmergencyPowerReduction::DeviceSpecific             => 0b01,
+             EmergencyPowerReduction::FormFactorOrDeviceSpecific => 0b10,
+             EmergencyPowerReduction::Reserved                   => 0b11,
+        }
+    }
+}
 
 
 #[bitfield(bits = 16)]
@@ -1690,6 +1791,23 @@ pub struct DeviceControl2Proto {
     enable_10bit_tag_requester: bool,
     obff_enable: B2,
     end_end_tlp_prefix_blocking: bool,
+}
+impl<'a> From<&'a DeviceControl2> for DeviceControl2Proto {
+    fn from(data: &DeviceControl2) -> Self {
+        Self::new()
+            .with_completion_timeout_value(data.completion_timeout_value.clone().into())
+            .with_completion_timeout_disable(data.completion_timeout_disable)
+            .with_ari_forwarding_enable(data.ari_forwarding_enable)
+            .with_atomic_op_requester_enable(data.atomic_op_requester_enable)
+            .with_atomic_op_egress_blocking(data.atomic_op_egress_blocking)
+            .with_ido_request_enable(data.ido_request_enable)
+            .with_ido_completion_enable(data.ido_completion_enable)
+            .with_ltr_mechanism_enable(data.ltr_mechanism_enable)
+            .with_emergency_power_reduction_request(data.emergency_power_reduction_request)
+            .with_enable_10bit_tag_requester(data.enable_10bit_tag_requester)
+            .with_obff_enable(data.obff_enable.clone().into())
+            .with_end_end_tlp_prefix_blocking(data.end_end_tlp_prefix_blocking.clone().into())
+    }
 }
 
 /// Device Control 2 Register
@@ -1741,6 +1859,9 @@ impl From<DeviceControl2Proto> for DeviceControl2 {
 impl From<u16> for DeviceControl2 {
     fn from(word: u16) -> Self { DeviceControl2Proto::from(word).into() }
 }
+impl<'a> From<&'a DeviceControl2> for u16 {
+    fn from(data: &DeviceControl2) -> Self { DeviceControl2Proto::from(data).into() }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompletionTimeoutValue {
@@ -1780,6 +1901,22 @@ impl From<u8> for CompletionTimeoutValue {
         }
     }
 }
+impl From<CompletionTimeoutValue> for u8 {
+    fn from(data: CompletionTimeoutValue) -> Self {
+        match data {
+            CompletionTimeoutValue::DefaultRange50usTo50ms => 0b0000,
+            CompletionTimeoutValue::RangeA50usTo100us      => 0b0001,
+            CompletionTimeoutValue::RangeA1msTo10ms        => 0b0010,
+            CompletionTimeoutValue::RangeB16msTo55mss      => 0b0101,
+            CompletionTimeoutValue::RangeB65msTo210ms      => 0b0110,
+            CompletionTimeoutValue::RangeC260msTo900ms     => 0b1001,
+            CompletionTimeoutValue::RangeC1000msTo3500ms   => 0b1010,
+            CompletionTimeoutValue::RangeD4sTo13s          => 0b1101,
+            CompletionTimeoutValue::RangeD17sTo64s         => 0b1110,
+            CompletionTimeoutValue::Reserved(v)            => v,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObffEnable {
@@ -1800,6 +1937,16 @@ impl From<u8> for ObffEnable {
             0b10 => Self::MessageSignalingB,
             0b11 => Self::WakeSignaling,
                _ => unreachable!(),
+        }
+    }
+}
+impl From<ObffEnable> for u8 {
+    fn from(data: ObffEnable) -> Self {
+        match data {
+            ObffEnable::Disabled          => 0b00,
+            ObffEnable::MessageSignalingA => 0b01,
+            ObffEnable::MessageSignalingB => 0b10,
+            ObffEnable::WakeSignaling     => 0b11,
         }
     }
 }
@@ -1842,6 +1989,14 @@ impl From<bool> for EndEndTlpPrefixBlocking {
             Self::ForwardingBlocked
         } else {
             Self::ForwardingEnabled
+        }
+    }
+}
+impl From<EndEndTlpPrefixBlocking> for bool {
+    fn from(data: EndEndTlpPrefixBlocking) -> Self {
+        match data {
+            EndEndTlpPrefixBlocking::ForwardingEnabled => false,
+            EndEndTlpPrefixBlocking::ForwardingBlocked => true,
         }
     }
 }
