@@ -21,7 +21,7 @@ pub struct PowerManagementInterface {
     pub capabilities: Capabilities,
     pub control: Control,
     pub bridge: Bridge,
-    data: u8,
+    pub data: u8,
 }
 
 impl PowerManagementInterface {

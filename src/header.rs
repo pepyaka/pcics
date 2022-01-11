@@ -1,79 +1,83 @@
-//! Predefined header region
-//!
-//! The predefined header region consists of fields that uniquely identify the device and allow the
-//! device to be generically controlled. The predefined header portion of the Configuration Space
-//! is divided into two parts. The first 16 bytes are defined the same for all types of devices.
-//! The remaining bytes can have different layouts depending on the base function that the device
-//! supports. 
-//!
-//! ## Usage
-//! #### Type 00h Configuration Space Header
-//!
-//! ```plaintext
-//! VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] RS880 [Radeon HD 4250] [1002:9715] (prog-if 00 [VGA controller])
-//!         Subsystem: Fujitsu Technology Solutions Device [1734:11da]
-//!         Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr- Stepping- SERR- FastB2B- DisINTx-
-//!         Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
-//!         Latency: 0, Cache Line Size: 64 bytes
-//!         Interrupt: pin A routed to IRQ 11
-//!         Region 0: Memory at fc000000 (32-bit, prefetchable)
-//!         Region 1: I/O ports at e000
-//!         Region 2: Memory at ff500000 (32-bit, non-prefetchable)
-//!         Region 5: Memory at ff400000 (32-bit, non-prefetchable)
-//!         Capabilities: [50] Power Management version 3
-//! ```
-//! ```
-//! # use pcics::header::*;
-//! # use byte::{ ctx::LE, BytesExt, };
-//! let data = [
-//!     0x02,0x10,0x15,0x97,0x07,0x00,0x10,0x00,0x00,0x00,0x00,0x03,0x10,0x00,0x80,0x00,
-//!     0x08,0x00,0x00,0xfc,0x01,0xe0,0x00,0x00,0x00,0x00,0x50,0xff,0x00,0x00,0x00,0x00,
-//!     0x00,0x00,0x00,0x00,0x00,0x00,0x40,0xff,0x00,0x00,0x00,0x00,0x34,0x17,0xda,0x11,
-//!     0x00,0x00,0x00,0x00,0x50,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0b,0x01,0x00,0x00,
-//! ];
-//! let result = data.read_with::<Header>(&mut 0, LE).unwrap();
-//! let sample = Header {
-//!     vendor_id: 0x1002,
-//!     device_id: 0x9715,
-//!     command: 0b0000_0000_0000_0111.into(),
-//!     status: 0b0000_0000_0001_0000.into(),
-//!     revision_id: 0,
-//!     class_code: ClassCode {
-//!         interface: 0x00,
-//!         sub: 0x00,
-//!         base: 0x03,
-//!     },
-//!     cache_line_size: 64 / 4, // DWORD = 4 bytes
-//!     latency_timer: 0,
-//!     bist: BuiltInSelfTest {
-//!         is_capable: false,
-//!         is_running: false,
-//!         completion_code: 0x00,
-//!     },
-//!     capabilities_pointer: 0x50,
-//!     is_multi_function: true,
-//!     header_type: HeaderType::Normal(Normal {
-//!         base_addresses: BaseAddressesNormal([
-//!             0xfc000000 | 0b1000,
-//!             0xe000 | 0b01,
-//!             0xff500000 | 0b0000,
-//!             0,
-//!             0,
-//!             0xff400000 | 0b0000,
-//!         ]),
-//!         cardbus_cis_pointer: 0x00,
-//!         sub_vendor_id: 0x1734,
-//!         sub_device_id: 0x11da,
-//!         expansion_rom: Default::default(),
-//!         min_grant: 0,
-//!         max_latency: 0,
-//!     }),
-//!     interrupt_line: 0xb,
-//!     interrupt_pin: InterruptPin::IntA,
-//! };
-//! assert_eq!(sample, result);
-//!
-//! ```
+/*!
+## Predefined header region
+
+The predefined header region consists of fields that uniquely identify the device and allow the
+device to be generically controlled. The predefined header portion of the Configuration Space
+is divided into two parts. The first 16 bytes are defined the same for all types of devices.
+The remaining bytes can have different layouts depending on the base function that the device
+supports.
+
+## Examples
+#### Type 00h Configuration Space Header
+
+lspci out:
+```plaintext
+VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] RS880 [Radeon HD 4250] [1002:9715] (prog-if 00 [VGA controller])
+        Subsystem: Fujitsu Technology Solutions Device [1734:11da]
+        Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr- Stepping- SERR- FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 64 bytes
+        Interrupt: pin A routed to IRQ 11
+        Region 0: Memory at fc000000 (32-bit, prefetchable)
+        Region 1: I/O ports at e000
+        Region 2: Memory at ff500000 (32-bit, non-prefetchable)
+        Region 5: Memory at ff400000 (32-bit, non-prefetchable)
+```
+parsed Type 00h header:
+```rust
+use pcics::header::*;
+
+let data = [
+    // 0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
+    0x02,0x10,0x15,0x97,0x07,0x00,0x10,0x00,0x00,0x00,0x00,0x03,0x10,0x00,0x80,0x00, // 0x00
+    0x08,0x00,0x00,0xfc,0x01,0xe0,0x00,0x00,0x00,0x00,0x50,0xff,0x00,0x00,0x00,0x00, // 0x10
+    0x00,0x00,0x00,0x00,0x00,0x00,0x40,0xff,0x00,0x00,0x00,0x00,0x34,0x17,0xda,0x11, // 0x20
+    0x00,0x00,0x00,0x00,0x50,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0b,0x01,0x00,0x00, // 0x30
+];
+let result = Header::try_from(&data[..]).unwrap();
+let sample = Header {
+    vendor_id: 0x1002,
+    device_id: 0x9715,
+    command: 0b0000_0000_0000_0111.into(),
+    status: 0b0000_0000_0001_0000.into(),
+    revision_id: 0,
+    class_code: ClassCode {
+        interface: 0x00,
+        sub: 0x00,
+        base: 0x03,
+    },
+    cache_line_size: 64 / 4, // DWORD = 4 bytes
+    latency_timer: 0,
+    bist: BuiltInSelfTest {
+        is_capable: false,
+        is_running: false,
+        completion_code: 0x00,
+    },
+    capabilities_pointer: 0x50,
+    is_multi_function: true,
+    header_type: HeaderType::Normal(Normal {
+        base_addresses: BaseAddressesNormal([
+            0xfc000000 | 0b1000,
+            0xe000 | 0b01,
+            0xff500000 | 0b0000,
+            0,
+            0,
+            0xff400000 | 0b0000,
+        ]),
+        cardbus_cis_pointer: 0x00,
+        sub_vendor_id: 0x1734,
+        sub_device_id: 0x11da,
+        expansion_rom: Default::default(),
+        min_grant: 0,
+        max_latency: 0,
+    }),
+    interrupt_line: 0xb,
+    interrupt_pin: InterruptPin::IntA,
+};
+assert_eq!(sample, result);
+
+```
+*/
 
 use core::convert::TryInto;
 
@@ -114,21 +118,21 @@ pub use cardbus_bridge_control::CardbusBridgeControl;
 pub struct Header {
     /// Identifies the manufacturer of the device. Where valid IDs are allocated by PCI-SIG to
     /// ensure uniqueness and 0xFFFF is an invalid value that will be returned on read accesses to
-    /// Configuration Space registers of non-existent devices. 
-    pub vendor_id: u16, 
+    /// Configuration Space registers of non-existent devices.
+    pub vendor_id: u16,
     /// Identifies the particular device. Where valid IDs are allocated by the vendor
     pub device_id: u16,
-    pub command: Command, 
+    pub command: Command,
     pub status: Status<'P'>,
     /// Device specific revision identifier.
     pub revision_id: u8,
-    pub class_code: ClassCode, 
+    pub class_code: ClassCode,
     /// Specifies the system cache line size in 32-bit units. A device can limit the number of
     /// cacheline sizes it can support, if a unsupported value is written to this field, the
-    /// device will behave as if a value of 0 was written. 
-    pub cache_line_size: u8, 
+    /// device will behave as if a value of 0 was written.
+    pub cache_line_size: u8,
     /// Specifies the latency timer in units of PCI bus clocks.
-    pub latency_timer: u8, 
+    pub latency_timer: u8,
     /// Used to identify a multi-function device
     pub is_multi_function: bool,
     pub header_type: HeaderType,
@@ -139,20 +143,20 @@ pub struct Header {
     /// connected to and is implemented by any device that makes use of an interrupt pin. For
     /// the x86 architecture this register corresponds to the PIC IRQ numbers 0-15 (and not I/O
     /// APIC IRQ numbers) and a value of 0xFF defines no connection.
-    pub interrupt_line: u8, 
+    pub interrupt_line: u8,
     pub interrupt_pin: InterruptPin,
 }
 impl<'a> TryRead<'a, Endian> for Header {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
-        let vendor_id = bytes.read_with::<u16>(offset, endian)?; 
+        let vendor_id = bytes.read_with::<u16>(offset, endian)?;
         let device_id = bytes.read_with::<u16>(offset, endian)?;
-        let command = bytes.read_with::<u16>(offset, endian)?.into(); 
+        let command = bytes.read_with::<u16>(offset, endian)?.into();
         let status = bytes.read_with::<u16>(offset, endian)?.into();
         let revision_id = bytes.read_with::<u8>(offset, endian)?;
-        let class_code = bytes.read_with::<ClassCode>(offset, endian)?; 
-        let cache_line_size = bytes.read_with::<u8>(offset, endian)?; 
-        let latency_timer = bytes.read_with::<u8>(offset, endian)?; 
+        let class_code = bytes.read_with::<ClassCode>(offset, endian)?;
+        let cache_line_size = bytes.read_with::<u8>(offset, endian)?;
+        let latency_timer = bytes.read_with::<u8>(offset, endian)?;
         let htype = bytes.read_with::<u8>(offset, endian)?;
         let bist = bytes.read_with::<BuiltInSelfTest>(offset, endian)?;
         let (capabilities_pointer, interrupt_line, interrupt_pin);
@@ -169,11 +173,11 @@ impl<'a> TryRead<'a, Endian> for Header {
                         capabilities_pointer = bytes.read_with::<u8>(offset, endian)? & !0b11;
                         let _reserved: [u8; 7] = bytes.read_with::<&[u8]>(offset, Bytes::Len(7))?
                             .try_into().unwrap_or_default();
-                        interrupt_line = bytes.read_with::<u8>(offset, endian)?; 
+                        interrupt_line = bytes.read_with::<u8>(offset, endian)?;
                         interrupt_pin = bytes.read_with::<InterruptPin>(offset, endian)?;
                         bytes.read_with::<u8>(offset, endian)?
-                    }, 
-                    max_latency: bytes.read_with::<u8>(offset, endian)?, 
+                    },
+                    max_latency: bytes.read_with::<u8>(offset, endian)?,
                 })
             },
             0x01 => {
@@ -209,7 +213,7 @@ impl<'a> TryRead<'a, Endian> for Header {
                         bytes.read_with::<ExpansionRom>(offset, endian)?
                     },
                     bridge_control: {
-                        interrupt_line = bytes.read_with::<u8>(offset, endian)?; 
+                        interrupt_line = bytes.read_with::<u8>(offset, endian)?;
                         interrupt_pin = bytes.read_with::<InterruptPin>(offset, endian)?;
                         bytes.read_with::<u16>(offset, endian)?.into()
                     },
@@ -234,7 +238,7 @@ impl<'a> TryRead<'a, Endian> for Header {
                     io_access_address_range_0: bytes.read_with::<IoAccessAddressRange>(offset, endian)?,
                     io_access_address_range_1: bytes.read_with::<IoAccessAddressRange>(offset, endian)?,
                     bridge_control: {
-                        interrupt_line = bytes.read_with::<u8>(offset, endian)?; 
+                        interrupt_line = bytes.read_with::<u8>(offset, endian)?;
                         interrupt_pin = bytes.read_with::<InterruptPin>(offset, endian)?;
                         bytes.read_with::<u16>(offset, endian)?.into()
                     },
@@ -304,7 +308,7 @@ impl HeaderType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Normal {
     pub base_addresses: BaseAddressesNormal,
-    /// Points to the Card Information Structure and is used by devices that share silicon between CardBus and PCI. 
+    /// Points to the Card Information Structure and is used by devices that share silicon between CardBus and PCI.
     pub cardbus_cis_pointer: u32,
     /// Subsystem Vendor ID
     pub sub_vendor_id: u16,
@@ -314,10 +318,10 @@ pub struct Normal {
     pub expansion_rom: ExpansionRom,
     /// A read-only register that specifies the burst period length, in 1/4 microsecond units,
     /// that the device needs (assuming a 33 MHz clock rate).
-    pub min_grant: u8, 
+    pub min_grant: u8,
     /// A read-only register that specifies how often the device needs access to the PCI bus
     /// (in 1/4 microsecond units).
-    pub max_latency: u8, 
+    pub max_latency: u8,
 }
 
 /// PCI-to-PCI bridge (Type 01h)
@@ -441,7 +445,7 @@ pub struct Cardbus {
     pub pci_bus_number: u8,
     /// CardBus Bus Number
     pub cardbus_bus_number: u8,
-    /// Subordinate Bus Number 
+    /// Subordinate Bus Number
     pub subordinate_bus_number: u8,
     /// CardBus Latency Timer
     pub cardbus_latency_timer: u8,
@@ -509,7 +513,7 @@ impl<'a> TryRead<'a, Endian> for BuiltInSelfTest {
         Ok((bist, *offset))
     }
 }
-        
+
 
 /// Specifies which interrupt pin the device uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -566,7 +570,7 @@ impl From<InterruptPin> for u8 {
 
 
 /// The IO Base Register and I/O Limit Register defines the address range that is used by the
-/// bridge to determine when to forward an I/O transaction to the CardBus. 
+/// bridge to determine when to forward an I/O transaction to the CardBus.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IoAccessAddressRange {
     Addr16Bit {
@@ -656,7 +660,7 @@ impl From<IoAccessAddressRange > for [[u16;2]; 2] {
         }
     }
 }
-        
+
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ExpansionRom {
@@ -667,7 +671,7 @@ impl<'a> TryRead<'a, Endian> for ExpansionRom {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
         let dword = bytes.read_with::<u32>(offset, endian)?;
-        let expansion_rom = ExpansionRom { 
+        let expansion_rom = ExpansionRom {
             address: dword & !0x7ff,
             is_enabled: dword & 1 != 0,
         };
@@ -676,7 +680,7 @@ impl<'a> TryRead<'a, Endian> for ExpansionRom {
 }
 impl From<u32> for ExpansionRom {
     fn from(dword: u32) -> Self {
-        Self { 
+        Self {
             address: dword & !0x7ff,
             is_enabled: dword & 1 != 0,
         }
@@ -863,7 +867,7 @@ mod tests {
                 secondary_bus_number: 0x05,
                 subordinate_bus_number: 0x08,
                 secondary_latency_timer: 0x00,
-                io_address_range: BridgeIoAddressRange::IoAddr32 { 
+                io_address_range: BridgeIoAddressRange::IoAddr32 {
                     base: 0xf000,
                     limit: 0x0 // lspci define output as io_limit+0xfff
                 },
@@ -877,7 +881,7 @@ mod tests {
                 expansion_rom: Default::default(),
                 bridge_control: 0b0000_0000_0001_1011.into(),
             }),
-            interrupt_line: 0xff, 
+            interrupt_line: 0xff,
             interrupt_pin: InterruptPin::Unused,
         };
         assert_eq!(sample, result);
@@ -956,7 +960,7 @@ mod tests {
                 is_running: false,
                 completion_code: 0x00,
             },
-            interrupt_line: 0x06, 
+            interrupt_line: 0x06,
             interrupt_pin: InterruptPin::Reserved(0x1a),
         };
         assert_eq!(sample, result);

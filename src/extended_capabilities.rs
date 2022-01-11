@@ -1,57 +1,93 @@
-//! PCI Express Extended Capabilities
-//!
-//! PCI Express Extended Capability registers are located in Configuration Space at offsets 256 or
-//! greater or in the Root Complex Register Block (RCRB). These registers when located in the
-//! Configuration Space are accessible using only the PCI Express Enhanced Configuration Access
-//! Mechanism (ECAM).
-//!
-//! Extended Capabilities list:
-//! - [x] Null Capability (0000h)
-//! - [x] [Advanced Error Reporting](AdvancedErrorReporting) (AER) (0001h)
-//! - [x] [Virtual Channel](VirtualChannel) (VC) – used if an MFVC Extended Cap structure is not present in the device (0002h)
-//! - [x] [Device Serial Number](DeviceSerialNumber) (0003h)
-//! - [ ] Power Budgeting (0004h)
-//! - [ ] Root Complex Link Declaration (0005h)
-//! - [ ] Root Complex Internal Link Control (0006h)
-//! - [ ] Root Complex Event Collector Endpoint Association (0007h)
-//! - [ ] Multi-Function Virtual Channel (MFVC) (0008h)
-//! - [ ] Virtual Channel (VC) – used if an MFVC Extended Cap structure is present in the device (0009h)
-//! - [ ] Root Complex Register Block (RCRB) Header (000Ah)
-//! - [x] [Vendor-Specific Extended Capability](VendorSpecificExtendedCapability) (VSEC) (000Bh)
-//! - [ ] Configuration Access Correlation (CAC) (000Ch)
-//! - [ ] Access Control Services (ACS) (000Dh)
-//! - [x] [Alternative Routing-ID Interpretation](alternative_routing_id_interpolation) (ARI) (000Eh)
-//! - [x] [Address Translation Services](AddressTranslationServices) (ATS) (000Fh)
-//! - [ ] Single Root I/O Virtualization (SR-IOV) (0010h)
-//! - [ ] Multi-Root I/O Virtualization (MR-IOV) (0011h)
-//! - [ ] Multicast (0012h)
-//! - [ ] Page Request Interface (PRI) (0013h)
-//! - [ ] Reserved for AMD (0014h)
-//! - [ ] Resizable BAR (0015h)
-//! - [ ] Dynamic Power Allocation (DPA) (0016h)
-//! - [ ] TPH Requester (0017h)
-//! - [x] [Latency Tolerance Reporting (LTR)](LatencyToleranceReporting) (0018h)
-//! - [x] [Secondary PCI Express](SecondaryPciExpress) (0019h)
-//! - [ ] Protocol Multiplexing (PMUX) (001Ah)
-//! - [x] [Process Address Space ID](ProcessAddressSpaceId) (PASID) (001Bh)
-//! - [ ] LN Requester (LNR) (001Ch)
-//! - [x] [Downstream Port Containment](DownstreamPortContainment) (DPC) (001Dh)
-//! - [x] [L1 PM Substates](L1PmSubstates) (001Eh)
-//! - [x] [Precision Time Measurement](PrecisionTimeMeasurement) (PTM) (001Fh)
-//! - [ ] PCI Express over M-PHY (M-PCIe) (0020h)
-//! - [ ] FRS Queueing (0021h)
-//! - [ ] Readiness Time Reporting (0022h)
-//! - [ ] Designated Vendor-Specific Extended Capability (0023h)
-//! - [ ] VF Resizable BAR (0024h)
-//! - [ ] Data Link Feature (0025h)
-//! - [ ] Physical Layer 16.0 GT/s (0026h)
-//! - [ ] Lane Margining at the Receiver (0027h)
-//! - [ ] Hierarchy ID (0028h)
-//! - [ ] Native PCIe Enclosure Management (NPEM) (0029h)
-//! - [ ] Physical Layer 32.0 GT/s (002Ah)
-//! - [ ] Alternate Protocol (002Bh)
-//! - [ ] System Firmware Intermediary (SFI) (002Ch)
-//! Others Reserved
+/*!
+PCI Express Extended Capabilities
+
+PCI Express Extended Capability registers are located in Configuration Space at offsets 256 or
+greater or in the Root Complex Register Block (RCRB). These registers when located in the
+Configuration Space are accessible using only the PCI Express Enhanced Configuration Access
+Mechanism (ECAM).
+
+Extended Capabilities list:
+- [x] Null Capability (0000h)
+- [x] [Advanced Error Reporting](advanced_error_reporting) (AER) (0001h)
+- [x] [Virtual Channel](virtual_channel) (VC) – used if an MFVC Extended Cap structure is not present in the device (0002h)
+- [x] [Device Serial Number](device_serial_number) (0003h)
+- [ ] Power Budgeting (0004h)
+- [ ] Root Complex Link Declaration (0005h)
+- [ ] Root Complex Internal Link Control (0006h)
+- [ ] Root Complex Event Collector Endpoint Association (0007h)
+- [ ] Multi-Function Virtual Channel (MFVC) (0008h)
+- [ ] Virtual Channel (VC) – used if an MFVC Extended Cap structure is present in the device (0009h)
+- [ ] Root Complex Register Block (RCRB) Header (000Ah)
+- [x] [Vendor-Specific Extended Capability](vendor_specific_extended_capability) (VSEC) (000Bh)
+- [ ] Configuration Access Correlation (CAC) (000Ch)
+- [ ] Access Control Services (ACS) (000Dh)
+- [x] [Alternative Routing-ID Interpretation](alternative_routing_id_interpolation) (ARI) (000Eh)
+- [x] [Address Translation Services](address_translation_services) (ATS) (000Fh)
+- [ ] Single Root I/O Virtualization (SR-IOV) (0010h)
+- [ ] Multi-Root I/O Virtualization (MR-IOV) (0011h)
+- [ ] Multicast (0012h)
+- [ ] Page Request Interface (PRI) (0013h)
+- [ ] Reserved for AMD (0014h)
+- [ ] Resizable BAR (0015h)
+- [ ] Dynamic Power Allocation (DPA) (0016h)
+- [ ] TPH Requester (0017h)
+- [x] [Latency Tolerance Reporting (LTR)](latency_tolerance_reporting) (0018h)
+- [x] [Secondary PCI Express](secondary_pci_express) (0019h)
+- [ ] Protocol Multiplexing (PMUX) (001Ah)
+- [x] [Process Address Space ID](process_address_space_id) (PASID) (001Bh)
+- [ ] LN Requester (LNR) (001Ch)
+- [x] [Downstream Port Containment](downstream_port_containment) (DPC) (001Dh)
+- [x] [L1 PM Substates](l1_pm_substates) (001Eh)
+- [x] [Precision Time Measurement](precision_time_measurement) (PTM) (001Fh)
+- [ ] PCI Express over M-PHY (M-PCIe) (0020h)
+- [ ] FRS Queueing (0021h)
+- [ ] Readiness Time Reporting (0022h)
+- [ ] Designated Vendor-Specific Extended Capability (0023h)
+- [ ] VF Resizable BAR (0024h)
+- [ ] Data Link Feature (0025h)
+- [ ] Physical Layer 16.0 GT/s (0026h)
+- [ ] Lane Margining at the Receiver (0027h)
+- [ ] Hierarchy ID (0028h)
+- [ ] Native PCIe Enclosure Management (NPEM) (0029h)
+- [ ] Physical Layer 32.0 GT/s (002Ah)
+- [ ] Alternate Protocol (002Bh)
+- [ ] System Firmware Intermediary (SFI) (002Ch)
+Others Reserved
+
+## Example
+lspci out:
+```plaintext
+Capabilities: [100 v1] Device Serial Number 11-22-33-44-55-66-77-88
+```
+parsed exetended capabilities:
+```rust
+# use pcics::extended_capabilities::{
+#     DeviceSerialNumber,
+#     ExtendedCapabilities,
+#     ExtendedCapability,
+#     ExtendedCapabilityKind,
+# };
+
+let data = [
+    // 0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
+    0x03,0x00,0x01,0x00,0xfe,0x85,0x54,0x45,0x00,0x50,0x56,0xff,0x00,0x00,0x00,0x00 // 0x100
+];
+let result = ExtendedCapabilities::new(&data)
+    .collect::<Vec<_>>();
+let sample = vec![
+    ExtendedCapability {
+        version: 1,
+        offset: 0x100,
+        kind: ExtendedCapabilityKind::DeviceSerialNumber(DeviceSerialNumber {
+            lower_dword: 0x88776655,
+            upper_dword: 0x44332211,
+        })
+    },
+];
+```
+*/
+
+
 
 use modular_bitfield::prelude::*;
 use byte::{
@@ -252,7 +288,7 @@ pub enum ExtendedCapabilityKind<'a> {
     AlternativeRoutingIdInterpretation(AlternativeRoutingIdInterpretation),
     /// Address Translation Services (ATS)
     AddressTranslationServices(AddressTranslationServices),
-    /// Single Root I/O Virtualization (SR-IOV) 
+    /// Single Root I/O Virtualization (SR-IOV)
     SingleRootIoVirtualization,
     /// Multi-Root I/O Virtualization (MR-IOV) – defined in the Multi-Root I/O Virtualization and
     /// Sharing Specification
@@ -311,7 +347,7 @@ pub enum ExtendedCapabilityKind<'a> {
     AlternateProtocol,
     /// System Firmware Intermediary (SFI)
     SystemFirmwareIntermediary,
-    Reserved(u16), 
+    Reserved(u16),
 }
 
 // 0001h Advanced Error Reporting (AER)
@@ -334,7 +370,7 @@ pub use power_budgeting::PowerBudgeting;
 pub mod vendor_specific_extended_capability;
 pub use vendor_specific_extended_capability::VendorSpecificExtendedCapability;
 
-// 000Dh Access Control Services (ACS) 
+// 000Dh Access Control Services (ACS)
 pub mod access_control_services;
 pub use access_control_services::{AccessControlServices, EgressControlVectors};
 
@@ -366,7 +402,7 @@ pub use secondary_pci_express::SecondaryPciExpress;
 pub mod process_address_space_id;
 pub use process_address_space_id::ProcessAddressSpaceId;
 
-// 001Dh Downstream Port Containment (DPC) 
+// 001Dh Downstream Port Containment (DPC)
 pub mod downstream_port_containment;
 pub use downstream_port_containment::DownstreamPortContainment;
 
@@ -374,7 +410,7 @@ pub use downstream_port_containment::DownstreamPortContainment;
 pub mod l1_pm_substates;
 pub use l1_pm_substates::L1PmSubstates;
 
-// 001Fh Precision Time Measurement (PTM) 
+// 001Fh Precision Time Measurement (PTM)
 pub mod precision_time_measurement;
 pub use precision_time_measurement::PrecisionTimeMeasurement;
 
