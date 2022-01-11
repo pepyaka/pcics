@@ -3,7 +3,7 @@
 //! ACS defines a set of control points within a PCI Express topology to determine whether a TLP is
 //! to be routed normally, blocked, or redirected.
 
-use std::slice::Chunks;
+use core::slice::Chunks;
 
 use modular_bitfield::prelude::*;
 use byte::{
@@ -196,7 +196,6 @@ impl<'a> Iterator for EgressControlVectors<'a> {
             );
         }
         let result = (self.dword & self.mask) != 0;
-        println!("{:x?} {:x?} {:?}", self.dword, self.mask, result);
         self.mask = self.mask.rotate_left(1);
         self.size -= 1;
         Some(result)
@@ -206,6 +205,7 @@ impl<'a> Iterator for EgressControlVectors<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::prelude::v1::*;
     use pretty_assertions::assert_eq;
     use super::*;
 

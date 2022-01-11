@@ -7,7 +7,7 @@
 //! - Any bit in the Lower SKP OS Generation Supported Speeds Vector field is Set
 //! - When Lane based errors are reported in the Lane Error Status register
 
-use std::slice::Chunks;
+use core::slice::Chunks;
 
 use modular_bitfield::prelude::*;
 use byte::{
@@ -172,6 +172,7 @@ impl From<u16> for LaneEqualizationControl {
 
 #[cfg(test)]
 mod tests {
+    use std::prelude::v1::*;
     use pretty_assertions::assert_eq;
     use super::*;
 

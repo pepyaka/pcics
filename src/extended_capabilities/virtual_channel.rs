@@ -337,25 +337,11 @@ impl<'a> Iterator for PortArbitrationTable<'a> {
             }
             let init_mask = !(u8::MAX << self.entry_size_bits);
             let mask = init_mask << self.shift;
-            println!("{:08b} {} {:02x}", mask, self.shift, self.byte);
             let result = (self.byte & mask) >> self.shift;
             self.shift = (self.shift + self.entry_size_bits) % 8;
             Some(PortArbitrationTableEntry(result))
         }
     }
-
-    //    match (self.entry_size_bits, self.shift) {
-    //        (8, 0) => self.byte & 0b1111_1111 >> 0,
-    //        (4, 0) => self.byte & 0b0000_1111 >> 0,
-    //        (4, 1) => self.byte & 0b1111_0000 >> 4,
-    //        (2, 0) => self.byte & 0b0000_0011 >> 0,
-    //        (2, 1) => self.byte & 0b0000_1100 >> 2,
-    //        (2, 2) => self.byte & 0b0011_0000 >> 4,
-    //        (2, 3) => self.byte & 0b1100_0000 >> 6,
-    //        (1, 0) => self.byte & 0b0000_0001 >> 0,
-    //        (1, 1) => self.byte & 0b0000_0010 >> 1,
-    //        (1, 2) => self.byte & 0b0000_0100 >> 2,
-    //        (1, 3) => self.byte & 0b0000_1000 >> 3,
 }
 impl<'a> PartialEq for PortArbitrationTable<'a> {
     fn eq(&self, other: &Self) -> bool {
@@ -732,6 +718,7 @@ impl From<u16> for PortVcStatus {
 
 #[cfg(test)]
 mod tests {
+    use std::prelude::v1::*;
     use pretty_assertions::assert_eq;
     use super::*;
 

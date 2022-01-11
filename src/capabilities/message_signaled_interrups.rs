@@ -6,10 +6,6 @@
 //! message data (from here on referred to as the “vector”) during device configuration, allocating
 //! one or more vectors to each MSI capable function.
 
-use core::array::TryFromSliceError;
-use core::ops::Range;
-
-use thiserror::Error;
 use modular_bitfield::prelude::*;
 use byte::{
     ctx::*,
@@ -146,15 +142,6 @@ impl From<u8> for NumberOfVectors {
             _ => Self::Reserved,
         }
     }
-}
-
-/// Parsing errors
-#[derive(Error, Debug)]
-pub enum MessageSignaledInterrupsError {
-    #[error("bytes range {0:?} is not available")]
-    DataRange(Range<usize>),
-    #[error("error while converting slice to array")]
-    IntoArray(#[from] TryFromSliceError),
 }
 
 

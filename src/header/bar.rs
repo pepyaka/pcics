@@ -13,6 +13,7 @@ use byte::{
     BytesExt,
 };
 
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseAddressesNormal(pub [u32; 6]);
 impl<'a> TryRead<'a, Endian> for BaseAddressesNormal {
@@ -179,8 +180,9 @@ pub enum BaseAddressType {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::prelude::v1::*;
     use pretty_assertions::assert_eq;
+    use super::*;
 
     #[test]
     fn iter_once() {

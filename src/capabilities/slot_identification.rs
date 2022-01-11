@@ -15,9 +15,9 @@ use byte::{
 /// Slot Identification
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SlotIdentification {
-    expansion_slot: ExpansionSlot,
+    pub expansion_slot: ExpansionSlot,
     /// Contains the physical chassis number for the slots on this bridge’s secondary interface
-    chassis_number: u8,
+    pub chassis_number: u8,
 }
 impl<'a> TryRead<'a, Endian> for SlotIdentification {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
@@ -43,9 +43,9 @@ pub struct ExpansionSlotProto {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExpansionSlot {
     /// Number of PCI expansion slots located directly on the secondary interface of this bridge
-    expansion_slots_provided: u8,
+    pub expansion_slots_provided: u8,
     /// Indicates that this bridge is the first in an expansion chassis
-    first_in_chassis: bool,
+    pub first_in_chassis: bool,
 }
 impl From<ExpansionSlotProto> for ExpansionSlot {
     fn from(proto: ExpansionSlotProto) -> Self {

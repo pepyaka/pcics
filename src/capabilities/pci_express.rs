@@ -2038,10 +2038,10 @@ impl<'a> TryRead<'a, Endian> for Link2Option {
 #[repr(u32)]
 pub struct LinkCapabilities2Proto {
     rsvdp: B1,
-    supported_link_speeds_vector: SupportedLinkSpeedsVectorProto,
+    supported_link_speeds_vector: B7,
     crosslink_supported: bool,
-    lower_skp_os_generation_supported_speeds_vector: SupportedLinkSpeedsVectorProto,
-    lower_skp_os_reception_supported_speeds_vector: SupportedLinkSpeedsVectorProto,
+    lower_skp_os_generation_supported_speeds_vector: B7,
+    lower_skp_os_reception_supported_speeds_vector: B7,
     retimer_presence_detect_supported: bool,
     two_retimers_presence_detect_supported: bool,
     rsvdp_2: B6,
@@ -2105,7 +2105,6 @@ impl From<LinkCapabilities2> for u32 {
 }
 
 #[bitfield(bits = 7)]
-#[derive(BitfieldSpecifier)]
 pub struct SupportedLinkSpeedsVectorProto {
     speed_2_5_gtps: bool,
     speed_5_0_gtps: bool,
@@ -2155,6 +2154,16 @@ impl From<SupportedLinkSpeedsVectorProto> for SupportedLinkSpeedsVector {
             speed_32_0_gtps: proto.speed_32_0_gtps(),
             speed_64_0_gtps: proto.speed_64_0_gtps(),
         }
+    }
+}
+impl From<u8> for SupportedLinkSpeedsVector {
+    fn from(byte: u8) -> Self {
+        SupportedLinkSpeedsVectorProto::from_bytes([byte]).into()
+    }
+}
+impl From<SupportedLinkSpeedsVector> for u8 {
+    fn from(data: SupportedLinkSpeedsVector) -> Self {
+        SupportedLinkSpeedsVectorProto::from(data).into_bytes()[0]
     }
 }
 

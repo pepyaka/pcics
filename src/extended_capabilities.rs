@@ -418,6 +418,7 @@ pub use precision_time_measurement::PrecisionTimeMeasurement;
 
 #[cfg(test)]
 mod tests {
+    use std::prelude::v1::*;
     use pretty_assertions::assert_eq;
     use super::*;
 
