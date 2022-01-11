@@ -11,7 +11,7 @@ Extended Capabilities list:
 - [x] [Advanced Error Reporting](advanced_error_reporting) (AER) (0001h)
 - [x] [Virtual Channel](virtual_channel) (VC) – used if an MFVC Extended Cap structure is not present in the device (0002h)
 - [x] [Device Serial Number](device_serial_number) (0003h)
-- [ ] Power Budgeting (0004h)
+- [x] [Power Budgeting](power_budgeting) (0004h)
 - [ ] Root Complex Link Declaration (0005h)
 - [ ] Root Complex Internal Link Control (0006h)
 - [ ] Root Complex Event Collector Endpoint Association (0007h)
@@ -20,17 +20,17 @@ Extended Capabilities list:
 - [ ] Root Complex Register Block (RCRB) Header (000Ah)
 - [x] [Vendor-Specific Extended Capability](vendor_specific_extended_capability) (VSEC) (000Bh)
 - [ ] Configuration Access Correlation (CAC) (000Ch)
-- [ ] Access Control Services (ACS) (000Dh)
+- [x] [Access Control Services](access_control_services) (ACS) (000Dh)
 - [x] [Alternative Routing-ID Interpretation](alternative_routing_id_interpolation) (ARI) (000Eh)
 - [x] [Address Translation Services](address_translation_services) (ATS) (000Fh)
 - [ ] Single Root I/O Virtualization (SR-IOV) (0010h)
 - [ ] Multi-Root I/O Virtualization (MR-IOV) (0011h)
 - [ ] Multicast (0012h)
-- [ ] Page Request Interface (PRI) (0013h)
+- [x] [Page Request Interface](page_request_interface) (PRI) (0013h)
 - [ ] Reserved for AMD (0014h)
 - [ ] Resizable BAR (0015h)
 - [ ] Dynamic Power Allocation (DPA) (0016h)
-- [ ] TPH Requester (0017h)
+- [x] [TPH Requester](tph_requester) (0017h)
 - [x] [Latency Tolerance Reporting (LTR)](latency_tolerance_reporting) (0018h)
 - [x] [Secondary PCI Express](secondary_pci_express) (0019h)
 - [ ] Protocol Multiplexing (PMUX) (001Ah)
@@ -59,7 +59,7 @@ lspci out:
 ```plaintext
 Capabilities: [100 v1] Device Serial Number 11-22-33-44-55-66-77-88
 ```
-parsed exetended capabilities:
+pcics extended capabilities:
 ```rust
 # use pcics::extended_capabilities::{
 #     DeviceSerialNumber,
@@ -192,7 +192,7 @@ impl<'a> Iterator for ExtendedCapabilities<'a> {
     }
 }
 
-
+/// Extended Capability
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExtendedCapability<'a> {
     pub kind: ExtendedCapabilityKind<'a>,
@@ -372,7 +372,7 @@ pub use vendor_specific_extended_capability::VendorSpecificExtendedCapability;
 
 // 000Dh Access Control Services (ACS)
 pub mod access_control_services;
-pub use access_control_services::{AccessControlServices, EgressControlVectors};
+pub use access_control_services::AccessControlServices;
 
 // 000Eh Alternative Routing-ID Interpretation (ARI)
 pub mod alternative_routing_id_interpolation;

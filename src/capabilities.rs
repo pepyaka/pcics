@@ -41,7 +41,7 @@ Capabilities: [70] Power Management version 3
 Capabilities: [a8] SATA HBA v1.0 BAR4 Offset=00000004
 ```
 
-parsed capabilities:
+pcics capabilities:
 ```rust
 # use pcics::capabilities::{
 #     Capabilities,
@@ -292,19 +292,22 @@ impl<'a> Iterator for Capabilities<'a> {
     }
 }
 
+/// Capability structure
 #[derive(Debug, PartialEq, Eq)]
 pub struct Capability<'a> {
     pub pointer: u8,
     pub kind: CapabilityKind<'a>,
 }
 
+/// Capability ID assigned by the PCI-SIG
 #[derive(Debug, PartialEq, Eq)]
 pub enum CapabilityKind<'a> {
-    /// Null Capability
+    /// 00h Null Capability
     ///
     /// This capability contains no registers. It may be present in any Function. Functions may
     /// contain multiple instances of this capability.
     NullCapability,
+    /// 01h PCI Power Management Interface
     PowerManagementInterface(PowerManagementInterface),
     // AcceleratedGraphicsPort(AcceleratedGraphicsPort),
     VitalProductData(VitalProductData),
@@ -321,7 +324,9 @@ pub enum CapabilityKind<'a> {
     Agp8x(Agp8x),
     SecureDevice(SecureDevice),
     PciExpress(PciExpress),
+    /// 11h MSI-X
     MsiX(MsiX),
+    /// 12h Serial ATA Data/Index Configuration
     Sata(Sata),
     AdvancedFeatures(AdvancedFeatures),
     Reserved(u8),

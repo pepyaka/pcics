@@ -1,7 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod header;
-pub use header::{Header, HeaderType};
+pub use header::Header;
 
 pub mod capabilities;
 pub use capabilities::Capabilities;
