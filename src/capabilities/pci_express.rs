@@ -63,12 +63,12 @@ impl<'a> TryRead<'a, Endian> for PciExpress {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct CapabilitiesProto {
-    version: B4,
-    device_type: B4,
-    slot_implemented: bool,
-    interrupt_message_number: B5,
-    tcs_routing_support: bool,
-    rsvdp: B1,
+    pub version: B4,
+    pub device_type: B4,
+    pub slot_implemented: bool,
+    pub interrupt_message_number: B5,
+    pub tcs_routing_support: bool,
+    pub rsvdp: B1,
 }
 
 /// The PCI Express Capabilities register identifies PCI Express device Function type and
@@ -166,20 +166,20 @@ impl<'a> TryRead<'a, Endian> for Device {
 #[bitfield(bits = 32)]
 #[repr(u32)]
 pub struct DeviceCapabilitiesProto {
-    max_payload_size_supported: B3,
-    phantom_functions_supported: B2,
-    extended_tag_field_supported: bool,
-    endpoint_l0s_acceptable_latency: B3,
-    endpoint_l1_acceptable_latency: B3,
-    attention_button_present: bool,
-    attention_indicator_present: bool,
-    power_indicator_present: bool,
-    role_based_error_reporting: bool,
-    rsvdp: B2,
-    captured_slot_power_limit_value: u8,
-    captured_slot_power_limit_scale: B2,
-    function_level_reset_capability: bool,
-    rsvdp_2: B3,
+    pub max_payload_size_supported: B3,
+    pub phantom_functions_supported: B2,
+    pub extended_tag_field_supported: bool,
+    pub endpoint_l0s_acceptable_latency: B3,
+    pub endpoint_l1_acceptable_latency: B3,
+    pub attention_button_present: bool,
+    pub attention_indicator_present: bool,
+    pub power_indicator_present: bool,
+    pub role_based_error_reporting: bool,
+    pub rsvdp: B2,
+    pub captured_slot_power_limit_value: u8,
+    pub captured_slot_power_limit_scale: B2,
+    pub function_level_reset_capability: bool,
+    pub rsvdp_2: B3,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -428,18 +428,18 @@ impl<'a> From<&'a SlotPowerLimit> for f32 {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct DeviceControlProto {
-    correctable_error_reporting_enable: bool,
-    non_fatal_error_reporting_enable: bool,
-    fatal_error_reporting_enable: bool,
-    unsupported_request_reporting_enable: bool,
-    enable_relaxed_ordering: bool,
-    max_payload_size: B3,
-    extended_tag_field_enable: bool,
-    phantom_functions_enable: bool,
-    aux_power_pm_enable: bool,
-    enable_no_snoop: bool,
-    max_read_request_size: B3,
-    bcre_or_flreset: bool,
+    pub correctable_error_reporting_enable: bool,
+    pub non_fatal_error_reporting_enable: bool,
+    pub fatal_error_reporting_enable: bool,
+    pub unsupported_request_reporting_enable: bool,
+    pub enable_relaxed_ordering: bool,
+    pub max_payload_size: B3,
+    pub extended_tag_field_enable: bool,
+    pub phantom_functions_enable: bool,
+    pub aux_power_pm_enable: bool,
+    pub enable_no_snoop: bool,
+    pub max_read_request_size: B3,
+    pub bcre_or_flreset: bool,
 }
 
 /// The Device Control register controls PCI Express device specific parameters
@@ -500,13 +500,13 @@ impl From<u16> for DeviceControl {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct DeviceStatusProto {
-    correctable_error_detected: bool,
-    non_fatal_error_detected: bool,
-    fatal_error_detected: bool,
-    unsupported_request_detected: bool,
-    aux_power_detected: bool,
-    transactions_pending: bool,
-    rsvdz: B10,
+    pub correctable_error_detected: bool,
+    pub non_fatal_error_detected: bool,
+    pub fatal_error_detected: bool,
+    pub unsupported_request_detected: bool,
+    pub aux_power_detected: bool,
+    pub transactions_pending: bool,
+    pub rsvdz: B10,
 }
 
 /// Provides information about PCI Express device (Function) specific parameters
@@ -586,18 +586,18 @@ impl<'a> TryRead<'a, Endian> for LinkOption {
 #[bitfield(bits = 32)]
 #[repr(u32)]
 pub struct LinkCapabilitiesProto {
-    max_link_speed: B4,
-    maximum_link_width: B6,
-    active_state_power_management_support: B2,
-    l0s_exit_latency: B3,
-    l1_exit_latency: B3,
-    clock_power_management: bool,
-    surprise_down_error_reporting_capable: bool,
-    data_link_layer_link_active_reporting_capable: bool,
-    link_bandwidth_notification_capability: bool,
-    aspm_optionality_compliance: bool,
-    rsvdp: B1,
-    port_number: u8,
+    pub max_link_speed: B4,
+    pub maximum_link_width: B6,
+    pub active_state_power_management_support: B2,
+    pub l0s_exit_latency: B3,
+    pub l1_exit_latency: B3,
+    pub clock_power_management: bool,
+    pub surprise_down_error_reporting_capable: bool,
+    pub data_link_layer_link_active_reporting_capable: bool,
+    pub link_bandwidth_notification_capability: bool,
+    pub aspm_optionality_compliance: bool,
+    pub rsvdp: B1,
+    pub port_number: u8,
 }
 impl From<LinkCapabilities> for LinkCapabilitiesProto {
     fn from(data: LinkCapabilities) -> Self {
@@ -870,18 +870,18 @@ impl From<u8> for L1ExitLatency {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct LinkControlProto {
-    active_state_power_management_control: B2,
-    rsvdp: B1,
-    read_completion_boundary: bool,
-    link_disable: bool,
-    retrain_link: bool,
-    common_clock_configuration: bool,
-    extended_synch: bool,
-    enable_clock_power_management: bool,
-    hardware_autonomous_width_disable: bool,
-    link_bandwidth_management_interrupt_enable: bool,
-    link_autonomous_bandwidth_interrupt_enable: bool,
-    rsvdp_2: B4,
+    pub active_state_power_management_control: B2,
+    pub rsvdp: B1,
+    pub read_completion_boundary: bool,
+    pub link_disable: bool,
+    pub retrain_link: bool,
+    pub common_clock_configuration: bool,
+    pub extended_synch: bool,
+    pub enable_clock_power_management: bool,
+    pub hardware_autonomous_width_disable: bool,
+    pub link_bandwidth_management_interrupt_enable: bool,
+    pub link_autonomous_bandwidth_interrupt_enable: bool,
+    pub rsvdp_2: B4,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -943,14 +943,14 @@ impl From<bool> for ReadCompletionBoundary {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct LinkStatusProto {
-    current_link_speed: B4,
-    negotiated_link_width: B6,
-    link_training_error: bool,
-    link_training: bool,
-    slot_clock_configuration: bool,
-    data_link_layer_link_active: bool,
-    link_bandwidth_management_status: bool,
-    link_autonomous_bandwidth_status: bool,
+    pub current_link_speed: B4,
+    pub negotiated_link_width: B6,
+    pub link_training_error: bool,
+    pub link_training: bool,
+    pub slot_clock_configuration: bool,
+    pub data_link_layer_link_active: bool,
+    pub link_bandwidth_management_status: bool,
+    pub link_autonomous_bandwidth_status: bool,
 }
 
 /// The Link Status register provides information about PCI Express Link specific parameters
@@ -1031,18 +1031,18 @@ impl<'a> TryRead<'a, Endian> for SlotOption {
 #[bitfield(bits = 32)]
 #[repr(u32)]
 pub struct SlotCapabilitiesProto {
-    attention_button_present: bool,
-    power_controller_present: bool,
-    mrl_sensor_present: bool,
-    attention_indicator_present: bool,
-    power_indicator_present: bool,
-    hot_plug_surprise: bool,
-    hot_plug_capable: bool,
-    slot_power_limit_value: u8,
-    slot_power_limit_scale: B2,
-    electromechanical_interlock_present: bool,
-    no_command_completed_support: bool,
-    physical_slot_number: B13,
+    pub attention_button_present: bool,
+    pub power_controller_present: bool,
+    pub mrl_sensor_present: bool,
+    pub attention_indicator_present: bool,
+    pub power_indicator_present: bool,
+    pub hot_plug_surprise: bool,
+    pub hot_plug_capable: bool,
+    pub slot_power_limit_value: u8,
+    pub slot_power_limit_scale: B2,
+    pub electromechanical_interlock_present: bool,
+    pub no_command_completed_support: bool,
+    pub physical_slot_number: B13,
 }
 
 /// The Slot Capabilities register identifies PCI Express slot specific capabilities
@@ -1099,18 +1099,18 @@ impl From<u32> for SlotCapabilities {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct SlotControlProto {
-    attention_button_pressed_enable: bool,
-    power_fault_detected_enable: bool,
-    mrl_sensor_changed_enable: bool,
-    presence_detect_changed_enable: bool,
-    command_completed_interrupt_enable: bool,
-    hot_plug_interrupt_enable: bool,
-    attention_indicator_control: B2,
-    power_indicator_control: B2,
-    power_controller_control: bool,
-    electromechanical_interlock_control: bool,
-    data_link_layer_state_changed_enable: bool,
-    rsvdp: B3,
+    pub attention_button_pressed_enable: bool,
+    pub power_fault_detected_enable: bool,
+    pub mrl_sensor_changed_enable: bool,
+    pub presence_detect_changed_enable: bool,
+    pub command_completed_interrupt_enable: bool,
+    pub hot_plug_interrupt_enable: bool,
+    pub attention_indicator_control: B2,
+    pub power_indicator_control: B2,
+    pub power_controller_control: bool,
+    pub electromechanical_interlock_control: bool,
+    pub data_link_layer_state_changed_enable: bool,
+    pub rsvdp: B3,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1185,16 +1185,16 @@ impl From<u8> for IndicatorControl {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct SlotStatusProto {
-    attention_button_pressed: bool,
-    power_fault_detected: bool,
-    mrl_sensor_changed: bool,
-    presence_detect_changed: bool,
-    command_completed: bool,
-    mrl_sensor_state: bool,
-    presence_detect_state: bool,
-    electromechanical_interlock_status: bool,
-    data_link_layer_state_changed: bool,
-    rsvdz: B7,
+    pub attention_button_pressed: bool,
+    pub power_fault_detected: bool,
+    pub mrl_sensor_changed: bool,
+    pub presence_detect_changed: bool,
+    pub command_completed: bool,
+    pub mrl_sensor_state: bool,
+    pub presence_detect_state: bool,
+    pub electromechanical_interlock_status: bool,
+    pub data_link_layer_state_changed: bool,
+    pub rsvdz: B7,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1278,12 +1278,12 @@ impl<'a> TryRead<'a, Endian> for RootOption {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct RootControlProto {
-    system_error_on_correctable_error_enable: bool,
-    system_error_on_non_fatal_error_enable: bool,
-    system_error_on_fatal_error_enable: bool,
-    pme_interrupt_enable: bool,
-    crs_software_visibility_enable: bool,
-    rsvdp: B11,
+    pub system_error_on_correctable_error_enable: bool,
+    pub system_error_on_non_fatal_error_enable: bool,
+    pub system_error_on_fatal_error_enable: bool,
+    pub pme_interrupt_enable: bool,
+    pub crs_software_visibility_enable: bool,
+    pub rsvdp: B11,
 }
 
 /// The Root Control register controls PCI Express Root Complex specific parameters
@@ -1320,8 +1320,8 @@ impl From<u16> for RootControl {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct RootCapabilitiesProto {
-    crs_software_visibility: bool,
-    rsvdp: B15,
+    pub crs_software_visibility: bool,
+    pub rsvdp: B15,
 }
 
 /// The Root Capabilities register identifies PCI Express Root Port specific capabilities
@@ -1346,10 +1346,10 @@ impl From<u16> for RootCapabilities {
 #[bitfield(bits = 32)]
 #[repr(u32)]
 pub struct RootStatusProto {
-    pme_requester_id: u16,
-    pme_status: bool,
-    pme_pending: bool,
-    rsvdz: B14,
+    pub pme_requester_id: u16,
+    pub pme_status: bool,
+    pub pme_pending: bool,
+    pub rsvdz: B14,
 }
 
 /// The Root Status register provides information about PCI Express device specific parameters
@@ -1412,27 +1412,27 @@ impl<'a> TryRead<'a, Endian> for Device2Option {
 #[bitfield(bits = 32)]
 #[repr(u32)]
 pub struct DeviceCapabilities2Proto {
-    completion_timeout_ranges_supported: B4,
-    completion_timeout_disable_supported: bool,
-    ari_forwarding_supported: bool,
-    atomic_op_routing_supported: bool,
-    u32_atomicop_completer_supported: bool,
-    u64_atomicop_completer_supported: bool,
-    u128_cas_completer_supported: bool,
-    no_ro_enabled_pr_pr_passing: bool,
-    ltr_mechanism_supported: bool,
-    tph_completer_supported: B2,
-    ln_system_cls: B2,
-    support_10bit_tag_completer: bool,
-    support_10bit_tag_requester: bool,
-    obff_supported: B2,
-    extended_fmt_field_supported: bool,
-    end_end_tlp_prefix_supported: bool,
-    max_end_end_tlp_prefixes: B2,
-    emergency_power_reduction_supported: B2,
-    emergency_power_reduction_initialization_required: bool,
-    rsvdp: B4,
-    frs_supported: bool,
+    pub completion_timeout_ranges_supported: B4,
+    pub completion_timeout_disable_supported: bool,
+    pub ari_forwarding_supported: bool,
+    pub atomic_op_routing_supported: bool,
+    pub u32_atomicop_completer_supported: bool,
+    pub u64_atomicop_completer_supported: bool,
+    pub u128_cas_completer_supported: bool,
+    pub no_ro_enabled_pr_pr_passing: bool,
+    pub ltr_mechanism_supported: bool,
+    pub tph_completer_supported: B2,
+    pub ln_system_cls: B2,
+    pub support_10bit_tag_completer: bool,
+    pub support_10bit_tag_requester: bool,
+    pub obff_supported: B2,
+    pub extended_fmt_field_supported: bool,
+    pub end_end_tlp_prefix_supported: bool,
+    pub max_end_end_tlp_prefixes: B2,
+    pub emergency_power_reduction_supported: B2,
+    pub emergency_power_reduction_initialization_required: bool,
+    pub rsvdp: B4,
+    pub frs_supported: bool,
 }
 impl<'a> From<&'a DeviceCapabilities2> for DeviceCapabilities2Proto {
     fn from(data: &DeviceCapabilities2) -> Self {
@@ -1779,18 +1779,18 @@ impl From<EmergencyPowerReduction> for u8 {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct DeviceControl2Proto {
-    completion_timeout_value: B4,
-    completion_timeout_disable: bool,
-    ari_forwarding_enable: bool,
-    atomic_op_requester_enable: bool,
-    atomic_op_egress_blocking: bool,
-    ido_request_enable: bool,
-    ido_completion_enable: bool,
-    ltr_mechanism_enable: bool,
-    emergency_power_reduction_request: bool,
-    enable_10bit_tag_requester: bool,
-    obff_enable: B2,
-    end_end_tlp_prefix_blocking: bool,
+    pub completion_timeout_value: B4,
+    pub completion_timeout_disable: bool,
+    pub ari_forwarding_enable: bool,
+    pub atomic_op_requester_enable: bool,
+    pub atomic_op_egress_blocking: bool,
+    pub ido_request_enable: bool,
+    pub ido_completion_enable: bool,
+    pub ltr_mechanism_enable: bool,
+    pub emergency_power_reduction_request: bool,
+    pub enable_10bit_tag_requester: bool,
+    pub obff_enable: B2,
+    pub end_end_tlp_prefix_blocking: bool,
 }
 impl<'a> From<&'a DeviceControl2> for DeviceControl2Proto {
     fn from(data: &DeviceControl2) -> Self {
@@ -1955,7 +1955,7 @@ impl From<ObffEnable> for u8 {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct DeviceStatus2Proto {
-    rsvdz: B16,
+    pub rsvdz: B16,
 }
 
 /// Device Status 2 Register is a placeholder
@@ -2037,15 +2037,15 @@ impl<'a> TryRead<'a, Endian> for Link2Option {
 #[bitfield(bits = 32)]
 #[repr(u32)]
 pub struct LinkCapabilities2Proto {
-    rsvdp: B1,
-    supported_link_speeds_vector: B7,
-    crosslink_supported: bool,
-    lower_skp_os_generation_supported_speeds_vector: B7,
-    lower_skp_os_reception_supported_speeds_vector: B7,
-    retimer_presence_detect_supported: bool,
-    two_retimers_presence_detect_supported: bool,
-    rsvdp_2: B6,
-    drs_supported: bool,
+    pub rsvdp: B1,
+    pub supported_link_speeds_vector: B7,
+    pub crosslink_supported: bool,
+    pub lower_skp_os_generation_supported_speeds_vector: B7,
+    pub lower_skp_os_reception_supported_speeds_vector: B7,
+    pub retimer_presence_detect_supported: bool,
+    pub two_retimers_presence_detect_supported: bool,
+    pub rsvdp_2: B6,
+    pub drs_supported: bool,
 }
 impl From<LinkCapabilities2> for LinkCapabilities2Proto {
     fn from(data: LinkCapabilities2) -> Self {
@@ -2106,13 +2106,13 @@ impl From<LinkCapabilities2> for u32 {
 
 #[bitfield(bits = 7)]
 pub struct SupportedLinkSpeedsVectorProto {
-    speed_2_5_gtps: bool,
-    speed_5_0_gtps: bool,
-    speed_8_0_gtps: bool,
-    speed_16_0_gtps: bool,
-    speed_32_0_gtps: bool,
-    speed_64_0_gtps: bool,
-    rsvdp: B1,
+    pub speed_2_5_gtps: bool,
+    pub speed_5_0_gtps: bool,
+    pub speed_8_0_gtps: bool,
+    pub speed_16_0_gtps: bool,
+    pub speed_32_0_gtps: bool,
+    pub speed_64_0_gtps: bool,
+    pub rsvdp: B1,
 }
 impl From<SupportedLinkSpeedsVector> for SupportedLinkSpeedsVectorProto {
     fn from(data: SupportedLinkSpeedsVector) -> Self {
@@ -2171,14 +2171,14 @@ impl From<SupportedLinkSpeedsVector> for u8 {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct LinkControl2Proto {
-    target_link_speed: B4,
-    enter_compliance: bool,
-    hardware_autonomous_speed_disable: bool,
-    selectable_de_emphasis: bool,
-    transmit_margin: B3,
-    enter_modified_compliance: bool,
-    compliance_sos: bool,
-    compliance_preset_or_de_emphasis: B4,
+    pub target_link_speed: B4,
+    pub enter_compliance: bool,
+    pub hardware_autonomous_speed_disable: bool,
+    pub selectable_de_emphasis: bool,
+    pub transmit_margin: B3,
+    pub enter_modified_compliance: bool,
+    pub compliance_sos: bool,
+    pub compliance_preset_or_de_emphasis: B4,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2265,18 +2265,18 @@ impl From<u8> for CompliancePresetOrDeEmphasis {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct LinkStatus2Proto {
-    current_de_emphasis_level: bool,
-    equalization_complete: bool,
-    equalization_phase_1_successful: bool,
-    equalization_phase_2_successful: bool,
-    equalization_phase_3_successful: bool,
-    link_equalization_request: bool,
-    retimer_presence_detected: bool,
-    two_retimers_presence_detected: bool,
-    crosslink_resolution: B2,
-    rsvdz: B2,
-    downstream_component_presence: B3,
-    drs_message_received: bool,
+    pub current_de_emphasis_level: bool,
+    pub equalization_complete: bool,
+    pub equalization_phase_1_successful: bool,
+    pub equalization_phase_2_successful: bool,
+    pub equalization_phase_3_successful: bool,
+    pub link_equalization_request: bool,
+    pub retimer_presence_detected: bool,
+    pub two_retimers_presence_detected: bool,
+    pub crosslink_resolution: B2,
+    pub rsvdz: B2,
+    pub downstream_component_presence: B3,
+    pub drs_message_received: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2419,7 +2419,7 @@ impl<'a> TryRead<'a, Endian> for Slot2Option {
 #[bitfield(bits = 32)]
 #[repr(u32)]
 pub struct SlotCapabilities2Proto {
-    rsvdp: B32,
+    pub rsvdp: B32,
 }
 
 /// Slot Capabilities 2 Register
@@ -2443,7 +2443,7 @@ impl From<u32> for SlotCapabilities2 {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct SlotControl2Proto {
-    rsvdp: B16,
+    pub rsvdp: B16,
 }
 
 /// Slot Control 2 Register
@@ -2467,7 +2467,7 @@ impl From<u16> for SlotControl2 {
 #[bitfield(bits = 16)]
 #[repr(u16)]
 pub struct SlotStatus2Proto {
-    rsvdz: B16,
+    pub rsvdz: B16,
 }
 
 /// Slot Status 2 Register
