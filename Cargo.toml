@@ -1,6 +1,6 @@
 [package]
 name = "pcics"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["mbratchikov"]
 license = "MIT"
 readme = "README.md"
