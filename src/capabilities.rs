@@ -75,7 +75,7 @@ let result = Capabilities::new(&device_dependent_region, 0x80)
     .collect::<Vec<_>>();
 
 let sample = vec![
-    Capability {
+    Ok(Capability {
         pointer: 0x80,
         kind: CapabilityKind::MessageSignaledInterrups(MessageSignaledInterrups {
             message_control: msi::MessageControl {
@@ -91,8 +91,8 @@ let sample = vec![
             mask_bits: None,
             pending_bits: None,
         })
-    },
-    Capability {
+    }),
+    Ok(Capability {
         pointer: 0x70,
         kind: CapabilityKind::PowerManagementInterface(PowerManagementInterface {
             capabilities: pmi::Capabilities {
@@ -127,15 +127,15 @@ let sample = vec![
             },
             data: 0,
         })
-    },
-    Capability {
+    }),
+    Ok(Capability {
         pointer: 0xa8,
         kind: CapabilityKind::Sata(Sata {
             revision: sata::Revision { major: 1, minor: 0 },
             bar_offset: sata::BarOffset(0x00000004),
             bar_location: sata::BarLocation::Bar4,
         })
-    },
+    }),
 ];
 
 assert_eq!(sample, result);
@@ -143,7 +143,7 @@ assert_eq!(sample, result);
 */
 
 
-
+use thiserror::Error;
 use byte::{
     ctx::LE,
     // TryRead,
@@ -236,6 +236,30 @@ pub use advanced_features::AdvancedFeatures;
 // 15h Flattening Portal Bridge
 
 
+/// Capability parsing error
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum CapabilityError {
+    #[error("capabilities pointer should be greater than 0x40")]
+    CapabilityPointer,
+    #[error("[{0:04x}] capability header is not available")]
+    Header(usize),
+    #[error("`byte` crate error")]
+    ByteCrate(byte::Error),
+    #[error("[{ptr:02x}] capability ID {id:#02x} data incorrect size = {len:#04x}")]
+    DataSize {
+        id: u8,
+        ptr: u8,
+        len: usize,
+    },
+    #[error("PciExpress capability error")]
+    PciExpress(#[from] pci_express::PciExpressError),
+}
+impl From<byte::Error> for CapabilityError {
+    fn from(be: byte::Error) -> Self {
+        Self::ByteCrate(be)
+    }
+}
+
 
 /// An iterator through *Capabilities List*
 ///
@@ -253,43 +277,56 @@ impl<'a> Capabilities<'a> {
     }
 }
 impl<'a> Iterator for Capabilities<'a> {
-    type Item = Capability<'a>;
+    type Item = CapabilityResult<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // Stop iterating if next pointer is null
-        if self.pointer == 0 {
-            return None;
-        }
-        let pointer = self.pointer;
-        let data = &self.data;
-        // Capability data resides in Device dependent region (0x34 offset)
-        let offset = &mut usize::from(pointer).checked_sub(DDR_OFFSET)?;
-        // 8-bit ID field assigned by the PCI SIG
-        let cap_id = data.read_with::<u8>(offset, LE).ok()?;
-        // an 8 bit pointer in configuration space to the next capability
-        self.pointer = data.read_with::<u8>(offset, LE).ok()?;
-        let kind = match cap_id {
-            0x00 => CapabilityKind::NullCapability,
-            0x01 => data.read_with(offset, LE).map(CapabilityKind::PowerManagementInterface).ok()?,
-            0x03 => data.read_with(offset, LE).map(CapabilityKind::VitalProductData).ok()?,
-            0x04 => data.read_with(offset, LE).map(CapabilityKind::SlotIdentification).ok()?,
-            0x05 => data.read_with(offset, LE).map(CapabilityKind::MessageSignaledInterrups).ok()?,
-            0x06 => CapabilityKind::CompactPciHotSwap(CompactPciHotSwap),
-            0x08 => data.read_with(offset, LE).map(CapabilityKind::Hypertransport).ok()?,
-            0x09 => data.read_with(offset, LE).map(CapabilityKind::VendorSpecific).ok()?,
-            0x0a => data.read_with(offset, LE).map(CapabilityKind::DebugPort).ok()?,
-            0x0b => CapabilityKind::CompactPciResourceControl(CompactPciResourceControl),
-            0x0c => CapabilityKind::PciHotPlug(PciHotPlug),
-            0x0d => data.read_with(offset, LE).map(CapabilityKind::BridgeSubsystemVendorId).ok()?,
-            0x0f => CapabilityKind::SecureDevice(SecureDevice),
-            0x10 => data.read_with(offset, LE).map(CapabilityKind::PciExpress).ok()?,
-            0x11 => data.read_with(offset, LE).map(CapabilityKind::MsiX).ok()?,
-            0x12 => data.read_with(offset, LE).map(CapabilityKind::Sata).ok()?,
-            0x13 => data.read_with(offset, LE).map(CapabilityKind::AdvancedFeatures).ok()?,
-            v => CapabilityKind::Reserved(v),
-        };
-        Some(Capability { pointer, kind })
+        (self.pointer != 0).then(|| parse_cap(self.data, &mut self.pointer))
     }
+}
+
+type CapabilityResult<'a> = Result<Capability<'a>, CapabilityError>;
+fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
+    let ptr = *pointer;
+    // Capability data resides in Device dependent region (starts from 0x40)
+    let offset = (*pointer as usize).checked_sub(DDR_OFFSET)
+        .ok_or_else(|| {
+            *pointer = 0;
+            CapabilityError::CapabilityPointer
+        })?;
+    let (id, cap_data) =
+        if let Some([id, next, rest @ .. ]) = bytes.get(offset..) {
+            *pointer = *next;
+            (*id, rest)
+        } else {
+            return Err(CapabilityError::Header(offset));
+        };
+    // Data error formatter
+    let data_len_err = |_| -> CapabilityError {
+        CapabilityError::DataSize { id, ptr, len: cap_data.len() }
+    };
+    let kind = match id {
+        0x00 => CapabilityKind::NullCapability,
+        0x01 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::PowerManagementInterface)?,
+        0x03 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::VitalProductData)?,
+        0x04 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::SlotIdentification)?,
+        0x05 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::MessageSignaledInterrups)?,
+        0x06 => CapabilityKind::CompactPciHotSwap(CompactPciHotSwap),
+        0x08 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::Hypertransport)?,
+        0x09 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::VendorSpecific)?,
+        0x0a => cap_data.read_with(&mut 0, LE).map(CapabilityKind::DebugPort)?,
+        0x0b => CapabilityKind::CompactPciResourceControl(CompactPciResourceControl),
+        0x0c => CapabilityKind::PciHotPlug(PciHotPlug),
+        0x0d => cap_data.read_with(&mut 0, LE).map(CapabilityKind::BridgeSubsystemVendorId)?,
+        0x0f => CapabilityKind::SecureDevice(SecureDevice),
+        // 0x10 => data.read_with(&mut 0, LE).map(CapabilityKind::PciExpress)?,
+        0x10 => CapabilityKind::PciExpress(cap_data.try_into().map_err(data_len_err)?),
+        0x11 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::MsiX)?,
+        0x12 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::Sata)?,
+        0x13 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::AdvancedFeatures)?,
+        v => CapabilityKind::Reserved(v),
+    };
+    Ok(Capability { pointer: ptr, kind })
 }
 
 /// Capability structure
@@ -297,6 +334,11 @@ impl<'a> Iterator for Capabilities<'a> {
 pub struct Capability<'a> {
     pub pointer: u8,
     pub kind: CapabilityKind<'a>,
+}
+impl<'a> Capability<'a> {
+    /// Each capability in the capability list consists of an 8-bit ID field assigned by the PCI
+    /// SIG, an 8 bit pointer in configuration space to the next capability.
+    pub const HEADER_SIZE: usize = 2;
 }
 
 /// Capability ID assigned by the PCI-SIG
@@ -353,24 +395,24 @@ mod tests {
         let offset = data[0x34];
         let result = Capabilities::new(ddr, offset).collect::<Vec<_>>();
         let sample = vec![
-            Capability {
+            Ok(Capability {
                 pointer: 0x50,
                 kind: CapabilityKind::PowerManagementInterface(
                     data.read_with(&mut (0x50 + 2), LE).unwrap()
                 )
-            },
-            Capability {
+            }),
+            Ok(Capability {
                 pointer: 0x80,
                 kind: CapabilityKind::VendorSpecific(
                     data.read_with(&mut (0x80 + 2), LE).unwrap()
                 )
-            },
-            Capability {
+            }),
+            Ok(Capability {
                 pointer: 0x60,
                 kind: CapabilityKind::MessageSignaledInterrups(
                     data.read_with(&mut (0x60 + 2), LE).unwrap()
                 )
-            },
+            }),
 
         ];
         assert_eq!(sample, result);

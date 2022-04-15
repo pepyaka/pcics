@@ -66,9 +66,9 @@ pub struct LinkControl3Proto {
     speed_16_0_gtps: bool,
     speed_32_0_gtps: bool,
     speed_64_0_gtps: bool,
-    rsvdp_2: B1,
+    reserved: bool,
     // LinkControl3 reserved
-    rsvdp_3: B16,
+    rsvdp_2: B16,
 }
 
 /// Link Control 3
@@ -86,7 +86,6 @@ impl From<LinkControl3Proto> for LinkControl3 {
     fn from(proto: LinkControl3Proto) -> Self {
         let _ = proto.rsvdp();
         let _ = proto.rsvdp_2();
-        let _ = proto.rsvdp_3();
         Self {
             perform_equalization: proto.perform_equalization(),
             link_equalization_request_interrupt_enable:
@@ -98,6 +97,7 @@ impl From<LinkControl3Proto> for LinkControl3 {
                 speed_16_0_gtps: proto.speed_16_0_gtps(),
                 speed_32_0_gtps: proto.speed_32_0_gtps(),
                 speed_64_0_gtps: proto.speed_64_0_gtps(),
+                reserved: proto.reserved(),
             },
         }
     }
@@ -200,6 +200,7 @@ mod tests {
                     speed_16_0_gtps: false,
                     speed_32_0_gtps: false,
                     speed_64_0_gtps: false,
+                    reserved: false,
                 },
             },
             lane_error_status: LaneErrorStatus(0b1100_1111_1011),

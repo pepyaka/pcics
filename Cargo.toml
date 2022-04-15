@@ -8,13 +8,15 @@ repository = "https://github.com/pepyaka/pcics"
 documentation = "https://docs.rs/pcics"
 homepage = "https://github.com/pepyaka/pcics"
 description = "PCI configuration space access library"
-categories = ["no-std","hardware-support"]
+categories = ["hardware-support"]
 edition = "2021"
 
 [dependencies]
 modular-bitfield = "0.11.2"
 byte = "0.2.6"
 displaydoc = "0.2.3"
+heterob = "0.1.0"
+thiserror = "1.0.30"
 
 [dev-dependencies]
 pretty_assertions = "0.7"

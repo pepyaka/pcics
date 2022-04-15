@@ -1,10 +1,10 @@
 #![doc = include_str!("../README.md")]
 
-#![no_std]
+// #![no_std]
 
-#[cfg(test)]
-#[macro_use]
-extern crate std;
+// #[cfg(test)]
+// #[macro_use]
+// extern crate std;
 
 
 pub mod header;

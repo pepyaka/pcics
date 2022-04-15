@@ -16,14 +16,14 @@ Extended Capabilities list:
 - [ ] Root Complex Internal Link Control (0006h)
 - [ ] Root Complex Event Collector Endpoint Association (0007h)
 - [ ] Multi-Function Virtual Channel (MFVC) (0008h)
-- [ ] Virtual Channel (VC) – used if an MFVC Extended Cap structure is present in the device (0009h)
+- [x] [Virtual Channel](virtual_channel) (VC) – used if an MFVC Extended Cap structure is present in the device (0009h)
 - [ ] Root Complex Register Block (RCRB) Header (000Ah)
 - [x] [Vendor-Specific Extended Capability](vendor_specific_extended_capability) (VSEC) (000Bh)
 - [ ] Configuration Access Correlation (CAC) (000Ch)
 - [x] [Access Control Services](access_control_services) (ACS) (000Dh)
 - [x] [Alternative Routing-ID Interpretation](alternative_routing_id_interpolation) (ARI) (000Eh)
 - [x] [Address Translation Services](address_translation_services) (ATS) (000Fh)
-- [ ] Single Root I/O Virtualization (SR-IOV) (0010h)
+- [x] [Single Root I/O Virtualization](single_root_io_virtualization) (SR-IOV) (0010h)
 - [ ] Multi-Root I/O Virtualization (MR-IOV) (0011h)
 - [ ] Multicast (0012h)
 - [x] [Page Request Interface](page_request_interface) (PRI) (0013h)
@@ -89,11 +89,12 @@ let sample = vec![
 
 
 
-use modular_bitfield::prelude::*;
 use byte::{
     ctx::*,
     BytesExt,
 };
+use thiserror::Error;
+use heterob::{P3, bit_numbering::LsbInto};
 
 use super::ECS_OFFSET;
 
@@ -101,13 +102,41 @@ use super::ECS_OFFSET;
 pub const ECH_BYTES: usize = 4;
 
 
+/// Extended capability parsing error
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum ExtendedCapabilityError {
+    #[error("extended capability offset should be greater than 0xFF")]
+    CapabilityOffset,
+    #[error("extended capability header at offset {0:03x} shorter than u32")]
+    Header(u16),
+    #[error("extended capability has empty header")]
+    EmptyHeader,
+    #[error("`byte` crate error")]
+    ByteCrate(byte::Error),
+    #[error("extended capability data parse error: {0}")]
+    Data(#[from] ExtendedCapabilityDataError),
+}
+impl From<byte::Error> for ExtendedCapabilityError {
+    fn from(be: byte::Error) -> Self {
+        Self::ByteCrate(be)
+    }
+}
 
-#[bitfield(bits = 32)]
-#[repr(u32)]
-pub struct ExtendedCapabilityHeaderProto {
-    id: u16,
-    version: B4,
-    offset: B12,
+/// Extended capability data parsing error
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum ExtendedCapabilityDataError {
+    #[error("id: {id:#04x}, size (expected {expected:#04x}, found {found:#04x})")]
+    FixedSize {
+        id: u16,
+        expected: usize,
+        found: usize,
+    },
+    #[error("id: {id:#04x}, offset {offset:#04x} problem ({msg})")]
+    DynamicSize {
+        id: u16,
+        offset: usize,
+        msg: &'static str,
+    },
 }
 
 /// An iterator through *Extended Capabilities List*
@@ -119,58 +148,82 @@ pub struct ExtendedCapabilities<'a> {
 }
 impl<'a> ExtendedCapabilities<'a> {
     pub fn new(ecs: &'a [u8]) -> Self {
-        Self { ecs, offset: 0x100 }
+        Self { ecs, offset: ECS_OFFSET as u16 }
     }
 }
 impl<'a> Iterator for ExtendedCapabilities<'a> {
-    type Item = ExtendedCapability<'a>;
+    type Item = ExtendedCapabilityResult<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.offset == 0 {
             return None;
         }
-        let offset = self.offset;
-        let bytes = &self.ecs;
-        let ecs_offset = &mut usize::from(self.offset).checked_sub(ECS_OFFSET)?;
-        let header = bytes.read_with::<u32>(ecs_offset, LE).ok()?;
-        if header == 0 {
-            return None;
+        match parse_ecap(self.ecs, &mut self.offset) {
+            Err(ExtendedCapabilityError::EmptyHeader) => None,
+            v => Some(v),
         }
-        let header: ExtendedCapabilityHeaderProto = header.into();
+    }
+}
+
+type ExtendedCapabilityResult<'a> = Result<ExtendedCapability<'a>, ExtendedCapabilityError>;
+fn parse_ecap<'a>(bytes: &'a [u8], offset: &mut u16) -> ExtendedCapabilityResult<'a> {
+        let curr_offset = *offset;
+        let ecs_offset = (curr_offset as usize).checked_sub(ECS_OFFSET)
+            .ok_or_else(|| {
+                *offset = 0;
+                ExtendedCapabilityError::CapabilityOffset
+            })?;
+        let ecap_data_offset = ecs_offset + ECH_BYTES;
+        let dword = &bytes.get(ecs_offset .. ecap_data_offset)
+            // We can use unwrap on already length checked slice
+            .map(|slice| u32::from_le_bytes(slice.try_into().unwrap()))
+            .ok_or_else(|| {
+                *offset = 0;
+                ExtendedCapabilityError::Header(curr_offset)
+            })?;
+        if *dword == 0 {
+            return Err(ExtendedCapabilityError::EmptyHeader);
+        }
+        let (id, version, next_offset) = P3::<_, 16, 4, 12>(*dword).lsb_into();
+        *offset = next_offset;
+
+        let ecap_data = &bytes[ecap_data_offset..];
+        let ecap_data_offset = &mut ecap_data_offset.clone(); // ecap u32 sized
+
         use ExtendedCapabilityKind::*;
-        let kind = match header.id() {
+        let kind = match id {
             0x0000 => Null,
-            0x0001 => AdvancedErrorReporting(bytes.read_with(ecs_offset, LE).ok()?),
-            0x0002 => VirtualChannel(bytes.read_with(ecs_offset, LE).ok()?),
-            0x0003 => DeviceSerialNumber(bytes.read_with(ecs_offset, LE).ok()?),
-            0x0004 => PowerBudgeting(bytes.read_with(ecs_offset, LE).ok()?),
-            0x0005 => RootComplexLinkDeclaration,
+            0x0001 => AdvancedErrorReporting(bytes.read_with(ecap_data_offset, LE)?),
+            0x0002 => VirtualChannel(bytes.read_with(ecap_data_offset, LE)?),
+            0x0003 => DeviceSerialNumber(bytes.read_with(ecap_data_offset, LE)?),
+            0x0004 => PowerBudgeting(bytes.read_with(ecap_data_offset, LE)?),
+            0x0005 => RootComplexLinkDeclaration(ecap_data.try_into()?),
             0x0006 => RootComplexInternalLinkControl,
             0x0007 => RootComplexEventCollectorEndpointAssociation,
             0x0008 => MultiFunctionVirtualChannel,
-            0x0009 => VirtualChannelMfvcPresent,
+            0x0009 => VirtualChannelMfvcPresent(bytes.read_with(ecap_data_offset, LE)?),
             0x000A => RootComplexRegisterBlock,
-            0x000B => VendorSpecificExtendedCapability(bytes.read_with(ecs_offset, LE).ok()?),
+            0x000B => VendorSpecificExtendedCapability(bytes.read_with(ecap_data_offset, LE)?),
             0x000C => ConfigurationAccessCorrelation,
-            0x000D => AccessControlServices(bytes.read_with(ecs_offset, LE).ok()?),
-            0x000E => AlternativeRoutingIdInterpretation(bytes.read_with(ecs_offset, LE).ok()?),
-            0x000F => AddressTranslationServices(bytes.read_with(ecs_offset, LE).ok()?),
-            0x0010 => SingleRootIoVirtualization,
+            0x000D => AccessControlServices(bytes.read_with(ecap_data_offset, LE)?),
+            0x000E => AlternativeRoutingIdInterpretation(bytes.read_with(ecap_data_offset, LE)?),
+            0x000F => AddressTranslationServices(bytes.read_with(ecap_data_offset, LE)?),
+            0x0010 => SingleRootIoVirtualization(ecap_data.try_into()?),
             0x0011 => MultiRootIoVirtualization,
             0x0012 => Multicast,
-            0x0013 => PageRequestInterface(bytes.read_with(ecs_offset, LE).ok()?),
+            0x0013 => PageRequestInterface(bytes.read_with(ecap_data_offset, LE)?),
             0x0014 => AmdReserved,
             0x0015 => ResizableBar,
             0x0016 => DynamicPowerAllocation,
-            0x0017 => TphRequester(bytes.read_with(ecs_offset, LE).ok()?),
-            0x0018 => LatencyToleranceReporting(bytes.read_with(ecs_offset, LE).ok()?),
-            0x0019 => SecondaryPciExpress(bytes.read_with(ecs_offset, LE).ok()?),
+            0x0017 => TphRequester(bytes.read_with(ecap_data_offset, LE)?),
+            0x0018 => LatencyToleranceReporting(bytes.read_with(ecap_data_offset, LE)?),
+            0x0019 => SecondaryPciExpress(bytes.read_with(ecap_data_offset, LE)?),
             0x001A => ProtocolMultiplexing,
-            0x001B => ProcessAddressSpaceId(bytes.read_with(ecs_offset, LE).ok()?),
+            0x001B => ProcessAddressSpaceId(bytes.read_with(ecap_data_offset, LE)?),
             0x001C => LnRequester,
-            0x001D => DownstreamPortContainment(bytes.read_with(ecs_offset, LE).ok()?),
-            0x001E => L1PmSubstates(bytes.read_with(ecs_offset, LE).ok()?),
-            0x001F => PrecisionTimeMeasurement(bytes.read_with(ecs_offset, LE).ok()?),
+            0x001D => DownstreamPortContainment(bytes.read_with(ecap_data_offset, LE)?),
+            0x001E => L1PmSubstates(bytes.read_with(ecap_data_offset, LE)?),
+            0x001F => PrecisionTimeMeasurement(bytes.read_with(ecap_data_offset, LE)?),
             0x0020 => PciExpressOverMphy,
             0x0021 => FrsQueueing,
             0x0022 => ReadinessTimeReporting,
@@ -186,10 +239,7 @@ impl<'a> Iterator for ExtendedCapabilities<'a> {
             0x002C => SystemFirmwareIntermediary,
                  v => Reserved(v),
         };
-        let ecap = ExtendedCapability { kind, version: header.version(), offset, };
-        self.offset = header.offset();
-        Some(ecap)
-    }
+        Ok(ExtendedCapability { kind, version, offset: curr_offset })
 }
 
 /// Extended Capability
@@ -207,18 +257,18 @@ impl<'a> ExtendedCapability<'a> {
             ExtendedCapabilityKind::VirtualChannel(_) => 0x0002,
             ExtendedCapabilityKind::DeviceSerialNumber(_) => 0x0003,
             ExtendedCapabilityKind::PowerBudgeting(_) => 0x0004,
-            ExtendedCapabilityKind::RootComplexLinkDeclaration => 0x0005,
+            ExtendedCapabilityKind::RootComplexLinkDeclaration(_) => 0x0005,
             ExtendedCapabilityKind::RootComplexInternalLinkControl => 0x0006,
             ExtendedCapabilityKind::RootComplexEventCollectorEndpointAssociation => 0x0007,
             ExtendedCapabilityKind::MultiFunctionVirtualChannel => 0x0008,
-            ExtendedCapabilityKind::VirtualChannelMfvcPresent => 0x0009,
+            ExtendedCapabilityKind::VirtualChannelMfvcPresent(_) => 0x0009,
             ExtendedCapabilityKind::RootComplexRegisterBlock => 0x000A,
             ExtendedCapabilityKind::VendorSpecificExtendedCapability(_) => 0x000B,
             ExtendedCapabilityKind::ConfigurationAccessCorrelation => 0x000C,
             ExtendedCapabilityKind::AccessControlServices(_) => 0x000D,
             ExtendedCapabilityKind::AlternativeRoutingIdInterpretation(_) => 0x000E,
             ExtendedCapabilityKind::AddressTranslationServices(_) => 0x000F,
-            ExtendedCapabilityKind::SingleRootIoVirtualization => 0x0010,
+            ExtendedCapabilityKind::SingleRootIoVirtualization(_) => 0x0010,
             ExtendedCapabilityKind::MultiRootIoVirtualization => 0x0011,
             ExtendedCapabilityKind::Multicast => 0x0012,
             ExtendedCapabilityKind::PageRequestInterface(_) => 0x0013,
@@ -266,7 +316,7 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Power Budgeting
     PowerBudgeting(PowerBudgeting),
     /// Root Complex Link Declaration
-    RootComplexLinkDeclaration,
+    RootComplexLinkDeclaration(RootComplexLinkDeclaration<'a>),
     /// Root Complex Internal Link Control
     RootComplexInternalLinkControl,
     /// Root Complex Event Collector Endpoint Association
@@ -274,7 +324,7 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Multi-Function Virtual Channel (MFVC)
     MultiFunctionVirtualChannel,
     /// Virtual Channel (VC) – used if an MFVC Extended Cap structure is present in the device
-    VirtualChannelMfvcPresent,
+    VirtualChannelMfvcPresent(VirtualChannel<'a>),
     /// Root Complex Register Block (RCRB) Header
     RootComplexRegisterBlock,
     /// Vendor-Specific Extended Capability (VSEC)
@@ -289,7 +339,7 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Address Translation Services (ATS)
     AddressTranslationServices(AddressTranslationServices),
     /// Single Root I/O Virtualization (SR-IOV)
-    SingleRootIoVirtualization,
+    SingleRootIoVirtualization(SingleRootIoVirtualization),
     /// Multi-Root I/O Virtualization (MR-IOV) – defined in the Multi-Root I/O Virtualization and
     /// Sharing Specification
     MultiRootIoVirtualization,
@@ -350,11 +400,12 @@ pub enum ExtendedCapabilityKind<'a> {
     Reserved(u16),
 }
 
+
 // 0001h Advanced Error Reporting (AER)
 pub mod advanced_error_reporting;
 pub use advanced_error_reporting::AdvancedErrorReporting;
 
-// 0002h Virtual Channel (VC)
+// 0002h/0009h Virtual Channel (VC)
 pub mod virtual_channel;
 pub use virtual_channel::VirtualChannel;
 
@@ -366,9 +417,20 @@ pub use device_serial_number::DeviceSerialNumber;
 pub mod power_budgeting;
 pub use power_budgeting::PowerBudgeting;
 
+// 0005h Root Complex Link Declaration
+pub mod root_complex_link_declaration;
+pub use root_complex_link_declaration::RootComplexLinkDeclaration;
+
+// 0006h Root Complex Internal Link Control
+// 0007h Root Complex Event Collector Endpoint Association
+// 0008h Multi-Function Virtual Channel (MFVC)
+// 000Ah Root Complex Register Block (RCRB) Header
+
 // 000Bh Vendor-Specific Extended Capability (VSEC)
 pub mod vendor_specific_extended_capability;
 pub use vendor_specific_extended_capability::VendorSpecificExtendedCapability;
+
+// 000Ch Configuration Access Correlation (CAC) – defined by the Trusted Configuration Space (TCS) for PCI Express ECN, which is no longer supported
 
 // 000Dh Access Control Services (ACS)
 pub mod access_control_services;
@@ -382,9 +444,20 @@ pub use alternative_routing_id_interpolation::AlternativeRoutingIdInterpretation
 pub mod address_translation_services;
 pub use address_translation_services::AddressTranslationServices;
 
+// 0010h Single Root I/O Virtualization (SR-IOV)
+pub mod single_root_io_virtualization;
+pub use single_root_io_virtualization::SingleRootIoVirtualization;
+
+// 0011h Multi-Root I/O Virtualization (MR-IOV) – defined in the Multi-Root I/O Virtualization and Sharing Specification
+// 0012h Multicast
+
 // 0013h Page Request Interface (PRI)
 pub mod page_request_interface;
 pub use page_request_interface::PageRequestInterface;
+
+// 0014h Reserved for AMD
+// 0015h Resizable BAR
+// 0016h Dynamic Power Allocation (DPA)
 
 // 0017h TPH Requester
 pub mod tph_requester;
@@ -398,9 +471,13 @@ pub use latency_tolerance_reporting::LatencyToleranceReporting;
 pub mod secondary_pci_express;
 pub use secondary_pci_express::SecondaryPciExpress;
 
+// 001Ah Protocol Multiplexing (PMUX)
+
 // 001Bh Process Address Space ID (PASID)
 pub mod process_address_space_id;
 pub use process_address_space_id::ProcessAddressSpaceId;
+
+// 001Ch LN Requester (LNR)
 
 // 001Dh Downstream Port Containment (DPC)
 pub mod downstream_port_containment;
@@ -413,6 +490,20 @@ pub use l1_pm_substates::L1PmSubstates;
 // 001Fh Precision Time Measurement (PTM)
 pub mod precision_time_measurement;
 pub use precision_time_measurement::PrecisionTimeMeasurement;
+
+// 0020h PCI Express over M-PHY (M-PCIe)
+// 0021h FRS Queueing
+// 0022h Readiness Time Reporting
+// 0023h Designated Vendor-Specific Extended Capability
+// 0024h VF Resizable BAR
+// 0025h Data Link Feature
+// 0026h Physical Layer 16.0 GT/s
+// 0027h Lane Margining at the Receiver
+// 0028h Hierarchy ID
+// 0029h Native PCIe Enclosure Management (NPEM)
+// 002Ah Physical Layer 32.0 GT/s
+// 002Bh Alternate Protocol
+// 002Ch System Firmware Intermediary (SFI)
 
 
 
@@ -439,16 +530,16 @@ mod tests {
             [ECS_OFFSET..].try_into().unwrap()
         );
         let sample = vec![
-            (0x100, 0x000b),
-            (0x110, 0x000d),
-            (0x148, 0x0001),
-            (0x1d0, 0x000b),
-            (0x250, 0x0019),
-            (0x280, 0x000b),
-            (0x298, 0x000b),
-            (0x300, 0x000b),
+            Ok((0x100, 0x000b)),
+            Ok((0x110, 0x000d)),
+            Ok((0x148, 0x0001)),
+            Ok((0x1d0, 0x000b)),
+            Ok((0x250, 0x0019)),
+            Ok((0x280, 0x000b)),
+            Ok((0x298, 0x000b)),
+            Ok((0x300, 0x000b)),
         ];
-        let result = ecaps.map(|ecap| (ecap.offset, ecap.id()))
+        let result = ecaps.clone().map(|ecap| ecap.map(|ecap| (ecap.offset, ecap.id())))
             .collect::<Vec<_>>();
         assert_eq!(sample, result);
     }
