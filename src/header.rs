@@ -93,17 +93,19 @@ mod command;
 pub use command::Command;
 
 mod status;
-pub use status::Status;
+pub use status::{Status, DevselTiming};
 
 mod class_code;
 pub use class_code::ClassCode;
 
 mod bar;
 pub use bar::{
+    BaseAddress,
     BaseAddressType,
     BaseAddressesNormal,
     BaseAddressesBridge,
-    BaseAddressesCardbus
+    BaseAddressesCardbus,
+    BaseAddresses,
 };
 
 mod bridge_control;
@@ -223,6 +225,7 @@ impl<'a> TryRead<'a, Endian> for Header {
                 HeaderType::Cardbus(Cardbus {
                     base_addresses: bytes.read_with::<BaseAddressesCardbus>(offset, endian)?,
                     secondary_status: {
+                        // PCI-TO-CARDBUS BRIDGE capabilities_pointer at 0x14
                         capabilities_pointer = bytes.read_with::<u8>(offset, endian)? & !0b11;
                         let _reserved = bytes.read_with::<u8>(offset, endian)?;
                         bytes.read_with::<u16>(offset, endian)?.into()
@@ -242,12 +245,19 @@ impl<'a> TryRead<'a, Endian> for Header {
                         interrupt_pin = bytes.read_with::<InterruptPin>(offset, endian)?;
                         bytes.read_with::<u16>(offset, endian)?.into()
                     },
-                    subsystem_vendor_id: bytes.read_with::<u16>(offset, endian)?,
-                    subsystem_device_id: bytes.read_with::<u16>(offset, endian)?,
-                    legacy_mode_base_address: bytes.read_with::<u32>(offset, endian)?,
+                    subsystem_vendor_id: bytes.read_with::<u16>(offset, endian).ok(),
+                    subsystem_device_id: bytes.read_with::<u16>(offset, endian).ok(),
+                    legacy_mode_base_address: bytes.read_with::<u32>(offset, endian).ok(),
+                    reserved: bytes.read_with::<&[u8]>(offset, Bytes::Len(Cardbus::RESERVED_SIZE)).ok()
+                        .and_then(|slice| <[u8;Cardbus::RESERVED_SIZE]>::try_from(slice).ok()),
                 })
             },
-            _ => return Err(byte::Error::BadInput { err: "illegal header type" }),
+            v => {
+                capabilities_pointer = bytes.read_with::<u8>(&mut 0x34, endian)? & !0b11;
+                interrupt_line = bytes.read_with::<u8>(&mut 0x3c, endian)?;
+                interrupt_pin = bytes.read_with::<InterruptPin>(&mut 0x3d, endian)?;
+                HeaderType::Reserved(v)
+            },
         };
         let header = Header {
             vendor_id,
@@ -285,13 +295,18 @@ pub enum HeaderType {
     Normal(Normal),
     Bridge(Bridge),
     Cardbus(Cardbus),
+    Reserved(u8),
 }
 impl HeaderType {
-    pub fn base_addresses(&self) -> bar::BaseAddresses {
+    pub fn base_addresses(&self) -> Option<bar::BaseAddresses> {
         match self {
-            Self::Normal(Normal { base_addresses, .. }) => base_addresses.clone().into(),
-            Self::Bridge(Bridge { base_addresses, .. }) => base_addresses.clone().into(),
-            Self::Cardbus(Cardbus { base_addresses, .. }) => base_addresses.clone().into(),
+            Self::Normal(Normal { base_addresses, .. }) =>
+                Some(base_addresses.clone().into()),
+            Self::Bridge(Bridge { base_addresses, .. }) =>
+                Some(base_addresses.clone().into()),
+            Self::Cardbus(Cardbus { base_addresses, .. }) =>
+                Some(base_addresses.clone().into()),
+            Self::Reserved(_) => None,
         }
     }
     pub fn expansion_rom(&self) -> Option<ExpansionRom> {
@@ -354,15 +369,24 @@ pub struct Bridge {
 /// determine when to forward I/O transactions from one interface to the other.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BridgeIoAddressRange {
+    /// Bridge does not implement an I/O address range
     NotImplemented,
+    /// Bridge supports only 16-bit I/O address decoding
     IoAddr16 {
         base: u16,
         limit: u16,
     },
+    /// Bridge supports 32-bit I/O address decoding
     IoAddr32 {
         base: u32,
         limit: u32,
     },
+    /// Malformed I/O Base and I/O Limit registers contains distinct values
+    Malformed {
+        base: u8,
+        limit: u8,
+    },
+    /// Reserved
     Reserved {
         base: u8,
         limit: u8,
@@ -372,17 +396,21 @@ impl BridgeIoAddressRange {
     pub fn new(io_base: u8, io_limit: u8, io_base_upper_16: u16, io_limit_upper_16: u16) -> Self {
         let base_capability = io_base & 0xf;
         let base_address = io_base & !0xf;
-        let _limit_capability = io_limit & 0xf;
+        let limit_capability = io_limit & 0xf;
         let limit_address = io_limit & !0xf;
-        match (base_capability, base_address) {
-            (0x00, 0x00) => Self::NotImplemented,
-            (0x00, _) => Self::IoAddr16 {
+        match (base_capability, base_address, limit_capability, limit_address) {
+            (0x00, 0x00, 0x00, 0x00) => Self::NotImplemented,
+            (0x00, _, 0x00, _) => Self::IoAddr16 {
                 base: (base_address as u16) << 8,
                 limit: (limit_address as u16) << 8,
             },
-            (0x01, _) => Self::IoAddr32 {
+            (0x01, _, 0x01, _) => Self::IoAddr32 {
                 base: ((base_address as u32) << 8) | ((io_base_upper_16 as u32) << 16),
                 limit: ((limit_address as u32) << 8) | ((io_limit_upper_16 as u32) << 16),
+            },
+            (b_cap, _, l_cap, _) if b_cap != l_cap => Self::Malformed {
+                base: io_base,
+                limit: io_limit,
             },
             _ => Self::Reserved {
                 base: io_base,
@@ -397,15 +425,25 @@ impl BridgeIoAddressRange {
 /// transactions from one interface to the other
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BridgePrefetchableMemory {
+    /// Bridge does not implement a prefetchable memory address range
     NotImplemented,
+    /// Bridge supports only 32-bit addresses
     MemAddr32 {
         base: u32,
         limit: u32,
     },
+    /// Bridge supports 64-bit addresses
     MemAddr64 {
         base: u64,
         limit: u64,
     },
+    /// The bottom 4 bits of both the Prefetchable Memory Base and Prefetchable Memory Limit
+    /// registers contains distinct value
+    Malformed {
+        base: u16,
+        limit: u16,
+    },
+    /// All other encodings are Reserved
     Reserved {
         base: u16,
         limit: u16,
@@ -415,17 +453,21 @@ impl BridgePrefetchableMemory {
     pub fn new(base: u16, limit: u16, base_upper_32: u32, limit_upper_32: u32) -> Self {
         let base_capability = base & 0xf;
         let base_address = base & !0xf;
-        let _limit_capability = limit & 0xf;
+        let limit_capability = limit & 0xf;
         let limit_address = limit & !0xf;
-        match (base_capability, base_address) {
-            (0x00, 0x00) => Self::NotImplemented,
-            (0x00, _) => Self::MemAddr32 {
+        match (base_capability, base_address, limit_capability, limit_address) {
+            (0x00, 0x00, 0x00, 0x00) => Self::NotImplemented,
+            (0x00, _, 0x00, _) => Self::MemAddr32 {
                 base: (base_address as u32) << 16,
                 limit: (limit_address as u32) << 16,
             },
-            (0x01, _) => Self::MemAddr64 {
+            (0x01, _, 0x01, _) => Self::MemAddr64 {
                 base: ((base_address as u64) << 16) | ((base_upper_32 as u64) << 32),
                 limit: ((limit_address as u64) << 16) | ((limit_upper_32 as u64) << 32),
+            },
+            (b_cap, _, l_cap, _) if b_cap != l_cap => Self::Malformed {
+                base,
+                limit,
             },
             _ => Self::Reserved {
                 base,
@@ -461,11 +503,16 @@ pub struct Cardbus {
     pub io_access_address_range_1: IoAccessAddressRange,
     pub bridge_control: CardbusBridgeControl,
     /// Subsystem Vendor ID
-    pub subsystem_vendor_id: u16,
+    pub subsystem_vendor_id: Option<u16>,
     /// Subsystem Device ID
-    pub subsystem_device_id: u16,
+    pub subsystem_device_id: Option<u16>,
     /// PC Card 16 Bit IF Legacy Mode Base Address
-    pub legacy_mode_base_address: u32,
+    pub legacy_mode_base_address: Option<u32>,
+    /// Reserved
+    pub reserved: Option<[u8; Self::RESERVED_SIZE]>,
+}
+impl Cardbus {
+    const RESERVED_SIZE: usize = 0x80 - 0x48;
 }
 
 
@@ -581,10 +628,19 @@ pub enum IoAccessAddressRange {
         base: u32,
         limit: u32
     },
-    Unknown,
+    Unknown {
+        io_address_capability: u8,
+        base_lower: u16,
+        base_upper: u16,
+        limit_lower: u16,
+        limit_upper: u16,
+    },
+}
+impl IoAccessAddressRange {
+    const IO_CAP_MASK: u16 = 0b11;
 }
 impl Default for IoAccessAddressRange {
-    fn default() -> Self { IoAccessAddressRange::Unknown }
+    fn default() -> Self { IoAccessAddressRange::Addr16Bit { base: 0, limit: 0 } }
 }
 impl<'a> TryRead<'a, Endian> for IoAccessAddressRange {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
@@ -593,51 +649,33 @@ impl<'a> TryRead<'a, Endian> for IoAccessAddressRange {
         let base_upper = bytes.read_with::<u16>(offset, endian)?;
         let limit_lower = bytes.read_with::<u16>(offset, endian)?;
         let limit_upper = bytes.read_with::<u16>(offset, endian)?;
-        let io_access_address_range = match base_lower & 0b11 {
-            0x00 => Self::Addr16Bit {
-                base: base_lower & !0b11,
-                limit: limit_lower
-            },
-            0x01 => {
-                let base = u32::from_le_bytes({
-                    let lower = (base_lower & !0b11).to_le_bytes();
-                    let upper = base_upper.to_le_bytes();
-                    [lower[0], lower[1], upper[0], upper[1]]
-                });
-                let limit = u32::from_le_bytes({
-                    let lower = limit_lower.to_le_bytes();
-                    let upper = limit_upper.to_le_bytes();
-                    [lower[0], lower[1], upper[0], upper[1]]
-                });
-                Self::Addr32Bit { base, limit }
-            },
-            _ => Self::Unknown,
-        };
+        let io_access_address_range =
+            [[base_lower, base_upper], [limit_lower, limit_upper]].into();
         Ok((io_access_address_range, *offset))
     }
 }
 impl From<[[u16;2]; 2]> for IoAccessAddressRange {
     fn from(data: [[u16;2]; 2]) -> Self {
         let [[base_lower, base_upper], [limit_lower, limit_upper]] = data;
-        match base_lower & 0b11 {
+        let io_address_capability = (base_lower & Self::IO_CAP_MASK) as u8;
+        let base_lower = base_lower & !Self::IO_CAP_MASK;
+        let limit_lower = limit_lower & !Self::IO_CAP_MASK;
+        match io_address_capability {
             0x00 => Self::Addr16Bit {
-                base: base_lower & !0b11,
+                base: base_lower,
                 limit: limit_lower
             },
-            0x01 => {
-                let base = u32::from_le_bytes({
-                    let lower = (base_lower & !0b11).to_le_bytes();
-                    let upper = base_upper.to_le_bytes();
-                    [lower[0], lower[1], upper[0], upper[1]]
-                });
-                let limit = u32::from_le_bytes({
-                    let lower = limit_lower.to_le_bytes();
-                    let upper = limit_upper.to_le_bytes();
-                    [lower[0], lower[1], upper[0], upper[1]]
-                });
-                Self::Addr32Bit { base, limit }
+            0x01 => Self::Addr32Bit {
+                base: ((base_upper as u32) << 16) | (base_lower as u32),
+                limit: ((limit_upper as u32) << 16) | (limit_lower as u32),
             },
-            _ => Self::Unknown,
+            _ => Self::Unknown {
+                io_address_capability,
+                base_lower,
+                base_upper,
+                limit_lower,
+                limit_upper,
+            },
         }
     }
 }
@@ -703,16 +741,34 @@ mod tests {
     #[test]
     fn io_access_address_range() {
         let zeros = [[ 0x00, 0x00 ], [ 0x00, 0x00 ]];
-        assert_eq!(IoAccessAddressRange::Addr16Bit { base: 0, limit: 0 }, zeros.into(), "All zeros");
+        assert_eq!(
+            IoAccessAddressRange::Addr16Bit { base: 0, limit: 0 },
+            zeros.into(), "All zeros"
+        );
 
         let a16 = [[ 0x50, 0x00 ], [ 0x60, 0x00 ]];
-        assert_eq!(IoAccessAddressRange::Addr16Bit { base: 0x50, limit: 0x60 }, a16.into(), "16 Bit");
+        assert_eq!(
+            IoAccessAddressRange::Addr16Bit { base: 0x50, limit: 0x60 },
+            a16.into(), "16 Bit"
+        );
 
         let a32 = [[ 0x51, 0x50 ], [ 0x60, 0x60 ]];
-        assert_eq!(IoAccessAddressRange::Addr32Bit { base: 0x500050, limit: 0x600060 }, a32.into(), "32 Bit");
+        assert_eq!(
+            IoAccessAddressRange::Addr32Bit { base: 0x500050, limit: 0x600060 },
+            a32.into(), "32 Bit"
+        );
 
         let unkn = [[ 0x52, 0x50 ], [ 0x60, 0x60 ]];
-        assert_eq!(IoAccessAddressRange::Unknown, unkn.into(), "Unknown");
+        assert_eq!(
+            IoAccessAddressRange::Unknown {
+                io_address_capability: 0x02,
+                base_lower: 0x50,
+                base_upper: 0x50,
+                limit_lower: 0x60,
+                limit_upper: 0x60,
+            },
+            unkn.into(), "Unknown"
+        );
     }
 
     #[test]
@@ -951,9 +1007,10 @@ mod tests {
                     limit: 0x00070073 - 3,
                 },
                 bridge_control: 0b0000_0101_0100_0101.into(),
-                subsystem_vendor_id: 0x3322,
-                subsystem_device_id: 0x5544,
-                legacy_mode_base_address: 0x3322,
+                subsystem_vendor_id: Some(0x3322),
+                subsystem_device_id: Some(0x5544),
+                legacy_mode_base_address: Some(0x3322),
+                reserved: None,
             }),
             bist: BuiltInSelfTest {
                 is_capable: false,
