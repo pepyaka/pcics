@@ -93,8 +93,8 @@ use byte::{
     ctx::*,
     BytesExt,
 };
-use thiserror::Error;
 use heterob::{P3, bit_numbering::LsbInto};
+use snafu::prelude::*;
 
 use super::ECS_OFFSET;
 
@@ -103,40 +103,41 @@ pub const ECH_BYTES: usize = 4;
 
 
 /// Extended capability parsing error
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Snafu, Debug, Clone, PartialEq, Eq)]
 pub enum ExtendedCapabilityError {
-    #[error("extended capability offset should be greater than 0xFF")]
-    CapabilityOffset,
-    #[error("extended capability header at offset {0:03x} shorter than u32")]
-    Header(u16),
-    #[error("extended capability has empty header")]
-    EmptyHeader,
-    #[error("`byte` crate error")]
-    ByteCrate(byte::Error),
-    #[error("extended capability data parse error: {0}")]
-    Data(#[from] ExtendedCapabilityDataError),
+    #[snafu(display("extended capability offset should be greater than 0xFF"))]
+    Offset,
+    #[snafu(display("[{offset:03x}] extended capability header shorter than u32"))]
+    Header { offset: u16 },
+    #[snafu(display("[{offset:03x}] extended capability has empty header"))]
+    EmptyHeader { offset: u16 },
+    #[snafu(display("`byte` crate error"))]
+    ByteCrate { err: byte::Error },
+    #[snafu(display("[{offset:03x}] {source} data read error"))]
+    Data { offset: u16, source: ExtendedCapabilityDataError },
+    #[snafu(display("[{offset:03x}] Root Complex Link Declaration error: {source}"))]
+    RootComplexLinkDeclaration {
+        offset: u16,
+        source: root_complex_link_declaration::RootComplexLinkDeclarationError,
+    },
+    #[snafu(display("[{offset:03x}] Single Root I/O Virtualization error: {source}"))]
+    SingleRootIoVirtualization {
+        offset: u16,
+        source: single_root_io_virtualization::SingleRootIoVirtualizationError,
+    },
 }
 impl From<byte::Error> for ExtendedCapabilityError {
     fn from(be: byte::Error) -> Self {
-        Self::ByteCrate(be)
+        Self::ByteCrate { err: be }
     }
 }
 
-/// Extended capability data parsing error
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum ExtendedCapabilityDataError {
-    #[error("id: {id:#04x}, size (expected {expected:#04x}, found {found:#04x})")]
-    FixedSize {
-        id: u16,
-        expected: usize,
-        found: usize,
-    },
-    #[error("id: {id:#04x}, offset {offset:#04x} problem ({msg})")]
-    DynamicSize {
-        id: u16,
-        offset: usize,
-        msg: &'static str,
-    },
+/// Common error for reading capability data
+#[derive(Snafu, Debug, Clone, Copy, PartialEq, Eq)]
+#[snafu(display("{name} ({size} bytes)"))]
+pub struct ExtendedCapabilityDataError {
+    name: &'static str,
+    size: usize,
 }
 
 /// An iterator through *Extended Capabilities List*
@@ -144,102 +145,105 @@ pub enum ExtendedCapabilityDataError {
 pub struct ExtendedCapabilities<'a> {
     /// Extended Configuration Space
     ecs: &'a [u8],
-    offset: u16,
+    /// PCI Configuration Space offset
+    next_capability_offset: u16,
 }
 impl<'a> ExtendedCapabilities<'a> {
     pub fn new(ecs: &'a [u8]) -> Self {
-        Self { ecs, offset: ECS_OFFSET as u16 }
+        Self { ecs, next_capability_offset: ECS_OFFSET as u16 }
     }
 }
 impl<'a> Iterator for ExtendedCapabilities<'a> {
     type Item = ExtendedCapabilityResult<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.offset == 0 {
+        if self.next_capability_offset == 0 {
             return None;
         }
-        match parse_ecap(self.ecs, &mut self.offset) {
-            Err(ExtendedCapabilityError::EmptyHeader) => None,
+        match parse_ecap(self.ecs, &mut self.next_capability_offset) {
+            Err(ExtendedCapabilityError::EmptyHeader { .. }) => None,
             v => Some(v),
         }
     }
 }
 
 type ExtendedCapabilityResult<'a> = Result<ExtendedCapability<'a>, ExtendedCapabilityError>;
-fn parse_ecap<'a>(bytes: &'a [u8], offset: &mut u16) -> ExtendedCapabilityResult<'a> {
-        let curr_offset = *offset;
-        let ecs_offset = (curr_offset as usize).checked_sub(ECS_OFFSET)
+fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> ExtendedCapabilityResult<'a> {
+        let offset = *next_capability_offset;
+        let ecs_offset = (offset as usize).checked_sub(ECS_OFFSET)
             .ok_or_else(|| {
-                *offset = 0;
-                ExtendedCapabilityError::CapabilityOffset
+                *next_capability_offset = 0;
+                ExtendedCapabilityError::Offset
             })?;
         let ecap_data_offset = ecs_offset + ECH_BYTES;
         let dword = &bytes.get(ecs_offset .. ecap_data_offset)
             // We can use unwrap on already length checked slice
             .map(|slice| u32::from_le_bytes(slice.try_into().unwrap()))
             .ok_or_else(|| {
-                *offset = 0;
-                ExtendedCapabilityError::Header(curr_offset)
+                *next_capability_offset = 0;
+                ExtendedCapabilityError::Header { offset }
             })?;
         if *dword == 0 {
-            return Err(ExtendedCapabilityError::EmptyHeader);
+            return Err(ExtendedCapabilityError::EmptyHeader { offset });
         }
-        let (id, version, next_offset) = P3::<_, 16, 4, 12>(*dword).lsb_into();
-        *offset = next_offset;
+        let (id, version, next_cap_offset) = P3::<_, 16, 4, 12>(*dword).lsb_into();
+        *next_capability_offset = next_cap_offset;
 
         let ecap_data = &bytes[ecap_data_offset..];
         let ecap_data_offset = &mut ecap_data_offset.clone(); // ecap u32 sized
 
-        use ExtendedCapabilityKind::*;
+        use ExtendedCapabilityKind as Kind;
         let kind = match id {
-            0x0000 => Null,
-            0x0001 => AdvancedErrorReporting(bytes.read_with(ecap_data_offset, LE)?),
-            0x0002 => VirtualChannel(bytes.read_with(ecap_data_offset, LE)?),
-            0x0003 => DeviceSerialNumber(bytes.read_with(ecap_data_offset, LE)?),
-            0x0004 => PowerBudgeting(bytes.read_with(ecap_data_offset, LE)?),
-            0x0005 => RootComplexLinkDeclaration(ecap_data.try_into()?),
-            0x0006 => RootComplexInternalLinkControl,
-            0x0007 => RootComplexEventCollectorEndpointAssociation,
-            0x0008 => MultiFunctionVirtualChannel,
-            0x0009 => VirtualChannelMfvcPresent(bytes.read_with(ecap_data_offset, LE)?),
-            0x000A => RootComplexRegisterBlock,
-            0x000B => VendorSpecificExtendedCapability(bytes.read_with(ecap_data_offset, LE)?),
-            0x000C => ConfigurationAccessCorrelation,
-            0x000D => AccessControlServices(bytes.read_with(ecap_data_offset, LE)?),
-            0x000E => AlternativeRoutingIdInterpretation(bytes.read_with(ecap_data_offset, LE)?),
-            0x000F => AddressTranslationServices(bytes.read_with(ecap_data_offset, LE)?),
-            0x0010 => SingleRootIoVirtualization(ecap_data.try_into()?),
-            0x0011 => MultiRootIoVirtualization,
-            0x0012 => Multicast,
-            0x0013 => PageRequestInterface(bytes.read_with(ecap_data_offset, LE)?),
-            0x0014 => AmdReserved,
-            0x0015 => ResizableBar,
-            0x0016 => DynamicPowerAllocation,
-            0x0017 => TphRequester(bytes.read_with(ecap_data_offset, LE)?),
-            0x0018 => LatencyToleranceReporting(bytes.read_with(ecap_data_offset, LE)?),
-            0x0019 => SecondaryPciExpress(bytes.read_with(ecap_data_offset, LE)?),
-            0x001A => ProtocolMultiplexing,
-            0x001B => ProcessAddressSpaceId(bytes.read_with(ecap_data_offset, LE)?),
-            0x001C => LnRequester,
-            0x001D => DownstreamPortContainment(bytes.read_with(ecap_data_offset, LE)?),
-            0x001E => L1PmSubstates(bytes.read_with(ecap_data_offset, LE)?),
-            0x001F => PrecisionTimeMeasurement(bytes.read_with(ecap_data_offset, LE)?),
-            0x0020 => PciExpressOverMphy,
-            0x0021 => FrsQueueing,
-            0x0022 => ReadinessTimeReporting,
-            0x0023 => DesignatedVendorSpecificExtendedCapability,
-            0x0024 => VFResizableBar,
-            0x0025 => DataLinkFeature,
-            0x0026 => PhysicalLayer16GTps,
-            0x0027 => ReceiverLaneMargining,
-            0x0028 => HierarchyId,
-            0x0029 => NativePcieEnclosureManagement,
-            0x002A => PhysicalLayer32GTps,
-            0x002B => AlternateProtocol,
-            0x002C => SystemFirmwareIntermediary,
-                 v => Reserved(v),
+            0x0000 => Kind::Null,
+            0x0001 => Kind::AdvancedErrorReporting(bytes.read_with(ecap_data_offset, LE)?),
+            0x0002 => Kind::VirtualChannel(bytes.read_with(ecap_data_offset, LE)?),
+            0x0003 => Kind::DeviceSerialNumber(bytes.read_with(ecap_data_offset, LE)?),
+            0x0004 => Kind::PowerBudgeting(bytes.read_with(ecap_data_offset, LE)?),
+            0x0005 => ecap_data.try_into().map(Kind::RootComplexLinkDeclaration)
+                        .context(RootComplexLinkDeclarationSnafu { offset })?,
+            0x0006 => Kind::RootComplexInternalLinkControl,
+            0x0007 => Kind::RootComplexEventCollectorEndpointAssociation,
+            0x0008 => Kind::MultiFunctionVirtualChannel,
+            0x0009 => Kind::VirtualChannelMfvcPresent(bytes.read_with(ecap_data_offset, LE)?),
+            0x000A => Kind::RootComplexRegisterBlock,
+            0x000B => Kind::VendorSpecificExtendedCapability(bytes.read_with(ecap_data_offset, LE)?),
+            0x000C => Kind::ConfigurationAccessCorrelation,
+            0x000D => Kind::AccessControlServices(bytes.read_with(ecap_data_offset, LE)?),
+            0x000E => Kind::AlternativeRoutingIdInterpretation(bytes.read_with(ecap_data_offset, LE)?),
+            0x000F => Kind::AddressTranslationServices(bytes.read_with(ecap_data_offset, LE)?),
+            0x0010 => ecap_data.try_into().map(Kind::SingleRootIoVirtualization)
+                        .context(DataSnafu { offset })?,
+            0x0011 => Kind::MultiRootIoVirtualization,
+            0x0012 => Kind::Multicast,
+            0x0013 => Kind::PageRequestInterface(bytes.read_with(ecap_data_offset, LE)?),
+            0x0014 => Kind::AmdReserved,
+            0x0015 => Kind::ResizableBar,
+            0x0016 => Kind::DynamicPowerAllocation,
+            0x0017 => Kind::TphRequester(bytes.read_with(ecap_data_offset, LE)?),
+            0x0018 => Kind::LatencyToleranceReporting(bytes.read_with(ecap_data_offset, LE)?),
+            0x0019 => Kind::SecondaryPciExpress(bytes.read_with(ecap_data_offset, LE)?),
+            0x001A => Kind::ProtocolMultiplexing,
+            0x001B => Kind::ProcessAddressSpaceId(bytes.read_with(ecap_data_offset, LE)?),
+            0x001C => Kind::LnRequester,
+            0x001D => Kind::DownstreamPortContainment(bytes.read_with(ecap_data_offset, LE)?),
+            0x001E => Kind::L1PmSubstates(bytes.read_with(ecap_data_offset, LE)?),
+            0x001F => Kind::PrecisionTimeMeasurement(bytes.read_with(ecap_data_offset, LE)?),
+            0x0020 => Kind::PciExpressOverMphy,
+            0x0021 => Kind::FrsQueueing,
+            0x0022 => Kind::ReadinessTimeReporting,
+            0x0023 => Kind::DesignatedVendorSpecificExtendedCapability,
+            0x0024 => Kind::VFResizableBar,
+            0x0025 => Kind::DataLinkFeature,
+            0x0026 => Kind::PhysicalLayer16GTps,
+            0x0027 => Kind::ReceiverLaneMargining,
+            0x0028 => Kind::HierarchyId,
+            0x0029 => Kind::NativePcieEnclosureManagement,
+            0x002A => Kind::PhysicalLayer32GTps,
+            0x002B => Kind::AlternateProtocol,
+            0x002C => Kind::SystemFirmwareIntermediary,
+                 v => Kind::Reserved(v),
         };
-        Ok(ExtendedCapability { kind, version, offset: curr_offset })
+        Ok(ExtendedCapability { kind, version, offset })
 }
 
 /// Extended Capability

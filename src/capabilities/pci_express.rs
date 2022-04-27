@@ -33,14 +33,14 @@ these registers.
 use core::ops::Range;
 
 use heterob::{P6,P3, endianness::Le, bit_numbering::LsbInto, P12, P14, P7, P8, P10, P2, P4, P21, P9};
-use thiserror::Error;
+use snafu::prelude::*;
 
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Snafu, Debug, Clone, PartialEq, Eq)]
 pub enum PciExpressError {
-    #[error("can't read required bytes from slice")]
+    #[snafu(display("can't read required bytes from slice"))]
     RequiredBytesSlice,
-    #[error("can't read root bytes from slice")]
+    #[snafu(display("can't read root bytes from slice"))]
     RootBytesSlice,
 }
 

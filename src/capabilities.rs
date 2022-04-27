@@ -143,7 +143,7 @@ assert_eq!(sample, result);
 */
 
 
-use thiserror::Error;
+use snafu::prelude::*;
 use byte::{
     ctx::LE,
     // TryRead,
@@ -237,29 +237,34 @@ pub use advanced_features::AdvancedFeatures;
 
 
 /// Capability parsing error
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Snafu)]
 pub enum CapabilityError {
-    #[error("capabilities pointer should be greater than 0x40")]
-    CapabilityPointer,
-    #[error("[{0:04x}] capability header is not available")]
-    Header(usize),
-    #[error("`byte` crate error")]
-    ByteCrate(byte::Error),
-    #[error("[{ptr:02x}] capability ID {id:#02x} data incorrect size = {len:#04x}")]
-    DataSize {
-        id: u8,
-        ptr: u8,
-        len: usize,
-    },
-    #[error("PciExpress capability error")]
-    PciExpress(#[from] pci_express::PciExpressError),
+    #[snafu(display("capabilities pointer should be greater than 0x40"))]
+    Pointer,
+    #[snafu(display("[{ptr:02x}] capability header is not available"))]
+    Header { ptr: u8 },
+    #[snafu(display("`byte` crate error {err:?}"))]
+    ByteCrate { err: byte::Error },
+    #[snafu(display("[{ptr:02x}] {source} data read error"))]
+    Data { ptr: u8, source: CapabilityDataError },
+    #[snafu(display("[{ptr:02x}] Express error: {source}"))]
+    PciExpress { ptr: u8, source: pci_express::PciExpressError },
+    #[snafu(display("[{ptr:02x}] Vendor Specific error: {source}"))]
+    VendorSpecific { ptr: u8, source: vendor_specific::VendorSpecificError },
 }
 impl From<byte::Error> for CapabilityError {
     fn from(be: byte::Error) -> Self {
-        Self::ByteCrate(be)
+        Self::ByteCrate { err: be }
     }
 }
 
+/// Common error for reading capability data
+#[derive(Snafu, Debug, Clone, Copy, PartialEq, Eq)]
+#[snafu(display("{name} ({size} bytes)"))]
+pub struct CapabilityDataError {
+    name: &'static str,
+    size: usize,
+}
 
 /// An iterator through *Capabilities List*
 ///
@@ -292,39 +297,37 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
     let offset = (*pointer as usize).checked_sub(DDR_OFFSET)
         .ok_or_else(|| {
             *pointer = 0;
-            CapabilityError::CapabilityPointer
+            CapabilityError::Pointer
         })?;
     let (id, cap_data) =
         if let Some([id, next, rest @ .. ]) = bytes.get(offset..) {
             *pointer = *next;
             (*id, rest)
         } else {
-            return Err(CapabilityError::Header(offset));
+            return Err(CapabilityError::Header { ptr });
         };
-    // Data error formatter
-    let data_len_err = |_| -> CapabilityError {
-        CapabilityError::DataSize { id, ptr, len: cap_data.len() }
-    };
+    use CapabilityKind as Kind;
     let kind = match id {
-        0x00 => CapabilityKind::NullCapability,
-        0x01 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::PowerManagementInterface)?,
-        0x03 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::VitalProductData)?,
-        0x04 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::SlotIdentification)?,
-        0x05 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::MessageSignaledInterrups)?,
-        0x06 => CapabilityKind::CompactPciHotSwap(CompactPciHotSwap),
-        0x08 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::Hypertransport)?,
-        0x09 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::VendorSpecific)?,
-        0x0a => cap_data.read_with(&mut 0, LE).map(CapabilityKind::DebugPort)?,
-        0x0b => CapabilityKind::CompactPciResourceControl(CompactPciResourceControl),
-        0x0c => CapabilityKind::PciHotPlug(PciHotPlug),
-        0x0d => cap_data.read_with(&mut 0, LE).map(CapabilityKind::BridgeSubsystemVendorId)?,
-        0x0f => CapabilityKind::SecureDevice(SecureDevice),
-        // 0x10 => data.read_with(&mut 0, LE).map(CapabilityKind::PciExpress)?,
-        0x10 => CapabilityKind::PciExpress(cap_data.try_into().map_err(data_len_err)?),
-        0x11 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::MsiX)?,
-        0x12 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::Sata)?,
-        0x13 => cap_data.read_with(&mut 0, LE).map(CapabilityKind::AdvancedFeatures)?,
-        v => CapabilityKind::Reserved(v),
+        0x00 => Kind::NullCapability,
+        0x01 => cap_data.read_with(&mut 0, LE).map(Kind::PowerManagementInterface)?,
+        0x03 => cap_data.read_with(&mut 0, LE).map(Kind::VitalProductData)?,
+        0x04 => cap_data.read_with(&mut 0, LE).map(Kind::SlotIdentification)?,
+        0x05 => cap_data.read_with(&mut 0, LE).map(Kind::MessageSignaledInterrups)?,
+        0x06 => Kind::CompactPciHotSwap(CompactPciHotSwap),
+        0x08 => cap_data.read_with(&mut 0, LE).map(Kind::Hypertransport)?,
+        0x09 => cap_data.try_into().map(Kind::VendorSpecific)
+                    .context(VendorSpecificSnafu { ptr })?,
+        0x0a => cap_data.read_with(&mut 0, LE).map(Kind::DebugPort)?,
+        0x0b => Kind::CompactPciResourceControl(CompactPciResourceControl),
+        0x0c => Kind::PciHotPlug(PciHotPlug),
+        0x0d => cap_data.read_with(&mut 0, LE).map(Kind::BridgeSubsystemVendorId)?,
+        0x0f => Kind::SecureDevice(SecureDevice),
+        0x10 => cap_data.try_into().map(Kind::PciExpress)
+                    .context(PciExpressSnafu { ptr })?,
+        0x11 => cap_data.read_with(&mut 0, LE).map(Kind::MsiX)?,
+        0x12 => cap_data.read_with(&mut 0, LE).map(Kind::Sata)?,
+        0x13 => cap_data.read_with(&mut 0, LE).map(Kind::AdvancedFeatures)?,
+        v => Kind::Reserved(v),
     };
     Ok(Capability { pointer: ptr, kind })
 }
@@ -404,7 +407,7 @@ mod tests {
             Ok(Capability {
                 pointer: 0x80,
                 kind: CapabilityKind::VendorSpecific(
-                    data.read_with(&mut (0x80 + 2), LE).unwrap()
+                    data[0x80 + 2..].try_into().unwrap()
                 )
             }),
             Ok(Capability {

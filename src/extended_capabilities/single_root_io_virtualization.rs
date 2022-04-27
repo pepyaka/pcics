@@ -6,13 +6,24 @@
 
 use core::mem::size_of;
 
+use snafu::prelude::*;
 use heterob::{P16,P5,P6,P1, endianness::{FromLeBytes, LeBytesInto}, bit_numbering::Lsb};
 
 use crate::header::BaseAddressesNormal;
 use super::ExtendedCapabilityDataError;
 
 
+/// Single Root I/O Virtualization Error
+#[derive(Snafu, Debug, Clone, PartialEq, Eq)]
+pub enum SingleRootIoVirtualizationError {
+    #[snafu(display("can't read Element Self Description (4 bytes) from slice"))]
+    ElementSelfDescription,
+    #[snafu(display("can't read even one entry (4 bytes) from Link Entries"))]
+    LinkEntries,
+}
 
+
+/// Single Root I/O Virtualization (SR-IOV)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SingleRootIoVirtualization {
     /// SR-IOV Capabilities
@@ -77,15 +88,13 @@ impl From<[u8; SingleRootIoVirtualization::BYTES]> for SingleRootIoVirtualizatio
 impl<'a> TryFrom<&'a [u8]> for SingleRootIoVirtualization {
     type Error = ExtendedCapabilityDataError;
     fn try_from(slice: &'a [u8]) -> Result<Self, Self::Error> {
-        let mut array = [0; Self::BYTES];
-        let slice = slice.get(..Self::BYTES)
-            .ok_or(ExtendedCapabilityDataError::FixedSize {
-                id: 0x0010,
-                expected: Self::BYTES,
-                found: slice.len(),
-            })?;
-        array.clone_from_slice(slice);
-        Ok(array.into())
+        slice.get(..Self::BYTES)
+            .and_then(|slice| <[u8; Self::BYTES]>::try_from(slice).ok())
+            .ok_or(ExtendedCapabilityDataError {
+                name: "Single Root I/O Virtualization",
+                size: Self::BYTES
+            })
+            .map(Self::from)
     }
 }
 

@@ -7,10 +7,19 @@
 
 use core::slice;
 
+use snafu::prelude::*;
 use heterob::{P4,P5,P6, endianness::{LeBytesInto, FromLeBytes}, bit_numbering::Lsb};
 
-use super::ExtendedCapabilityDataError;
 
+
+/// Root Complex Link Declaration Error
+#[derive(Snafu, Debug, Clone, PartialEq, Eq)]
+pub enum RootComplexLinkDeclarationError {
+    #[snafu(display("can't read Element Self Description (4 bytes) from slice"))]
+    ElementSelfDescription,
+    #[snafu(display("can't read even one entry (4 bytes) from Link Entries"))]
+    LinkEntries,
+}
 
 
 /// Root Complex Link Declaration
@@ -20,43 +29,21 @@ pub struct RootComplexLinkDeclaration<'a> {
     pub link_entries: LinkEntries<'a>,
 }
 impl<'a> TryFrom<&'a [u8]> for RootComplexLinkDeclaration<'a> {
-    type Error = ExtendedCapabilityDataError;
+    type Error = RootComplexLinkDeclarationError;
     fn try_from(slice: &'a [u8]) -> Result<Self, Self::Error> {
-        let esd_slice = &slice[..slice.len().min(ElementSelfDescription::BYTES)];
-        let element_self_description: ElementSelfDescription =
-            <[u8; ElementSelfDescription::BYTES]>::try_from(esd_slice)
-                .map_err(|_| ExtendedCapabilityDataError::DynamicSize {
-                    id: 0x0010,
-                    offset: ElementSelfDescription::BYTES,
-                    msg: "Element Self Description slice",
-                })?
-                .le_bytes_into();
-        let slice = slice.get(LinkEntries::FIRST_ENTRY_OFFSET..) 
-            .ok_or(ExtendedCapabilityDataError::DynamicSize {
-                id: 0x0010,
-                offset: LinkEntries::FIRST_ENTRY_OFFSET,
-                msg: "Link Entries slice",
-            })?;
-        
-        let end = (element_self_description.number_of_link_entries as usize) * LinkEntry::BYTES;
-        let slice = slice.get(..end)
-            .ok_or(ExtendedCapabilityDataError::DynamicSize {
-                id: 0x0010,
-                offset: end,
-                msg: "Link Entries too short",
-            })?;
-        if slice.len() < LinkEntry::BYTES {
-            Err(ExtendedCapabilityDataError::DynamicSize {
-                id: 0x0010,
-                offset: LinkEntries::FIRST_ENTRY_OFFSET,
-                msg: "should be at least one Link Entry",
-            })
-        } else {
-            Ok(Self {
-                element_self_description,
-                link_entries: LinkEntries(slice.iter()),
-            })
-        }
+        let (start, end) = (0, ElementSelfDescription::BYTES);
+        let element_self_description: ElementSelfDescription = slice.get(start..end)
+            .and_then(|slice| <[u8; ElementSelfDescription::BYTES]>::try_from(slice).ok())
+            .ok_or(RootComplexLinkDeclarationError::ElementSelfDescription)?
+            .le_bytes_into();
+        let start = LinkEntries::FIRST_ENTRY_OFFSET;
+        let end = start +
+            (element_self_description.number_of_link_entries as usize) * LinkEntry::BYTES;
+        let bytes = slice.get(start..end)
+            .ok_or(RootComplexLinkDeclarationError::LinkEntries)?;
+        let link_entries = LinkEntries(bytes.iter());
+
+        Ok(Self { element_self_description, link_entries, })
     }
 }
 
@@ -131,8 +118,8 @@ impl<'a> Iterator for LinkEntries<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut bytes = [0u8; LinkEntry::BYTES];
-        for i in 0..LinkEntry::BYTES {
-            bytes[i] = *self.0.next()?;
+        for byte in bytes.iter_mut() {
+            *byte = *self.0.next()?;
         }
         let dwords: [u32; LinkEntry::DWORDS] = bytes.le_bytes_into();
         Some(dwords.into())
@@ -248,8 +235,9 @@ impl LinkAddress {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::prelude::v1::*;
     use pretty_assertions::assert_eq;
+    use super::*;
 
     #[test]
     fn link_description() {
