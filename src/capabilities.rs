@@ -324,7 +324,8 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
         0x0f => Kind::SecureDevice(SecureDevice),
         0x10 => cap_data.try_into().map(Kind::PciExpress)
                     .context(PciExpressSnafu { ptr })?,
-        0x11 => cap_data.read_with(&mut 0, LE).map(Kind::MsiX)?,
+        0x11 => cap_data.try_into().map(Kind::MsiX)
+                    .context(DataSnafu { ptr })?,
         0x12 => cap_data.read_with(&mut 0, LE).map(Kind::Sata)?,
         0x13 => cap_data.read_with(&mut 0, LE).map(Kind::AdvancedFeatures)?,
         v => Kind::Reserved(v),
