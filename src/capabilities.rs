@@ -79,15 +79,17 @@ let sample = vec![
         pointer: 0x80,
         kind: CapabilityKind::MessageSignaledInterrups(MessageSignaledInterrups {
             message_control: msi::MessageControl {
-                enable: true,
-                multiple_message_capable: msi::NumberOfVectors::One,
-                multiple_message_enable: msi::NumberOfVectors::One,
+                msi_enable: true,
+                multiple_message_capable: msi::MultipleMessage(0),
+                multiple_message_enable: msi::MultipleMessage(0),
                 per_vector_masking_capable: false,
-                reserved: 0,
+                a_64_bit_address_capable: false,
+                extended_message_data_capable: false,
+                extended_message_data_enable: false,
             },
             message_address: msi::MessageAddress::Dword(0xfee00358),
             message_data: 0x0000,
-            reserved: 0,
+            extended_message_data: 0x0000,
             mask_bits: None,
             pending_bits: None,
         })
@@ -142,14 +144,13 @@ assert_eq!(sample, result);
 ```
 */
 
-
-use snafu::prelude::*;
 use byte::{
     ctx::LE,
     // TryRead,
     // TryWrite,
     BytesExt,
 };
+use snafu::prelude::*;
 
 use super::DDR_OFFSET;
 
@@ -235,7 +236,6 @@ pub use advanced_features::AdvancedFeatures;
 
 // 15h Flattening Portal Bridge
 
-
 /// Capability parsing error
 #[derive(Debug, Clone, PartialEq, Eq, Snafu)]
 pub enum CapabilityError {
@@ -246,11 +246,25 @@ pub enum CapabilityError {
     #[snafu(display("`byte` crate error {err:?}"))]
     ByteCrate { err: byte::Error },
     #[snafu(display("[{ptr:02x}] {source} data read error"))]
-    Data { ptr: u8, source: CapabilityDataError },
-    #[snafu(display("[{ptr:02x}] Express error: {source}"))]
-    PciExpress { ptr: u8, source: pci_express::PciExpressError },
+    Data {
+        ptr: u8,
+        source: CapabilityDataError,
+    },
+    #[snafu(display("[{ptr:02x}] PCI Express error: {source}"))]
+    PciExpress {
+        ptr: u8,
+        source: pci_express::PciExpressError,
+    },
     #[snafu(display("[{ptr:02x}] Vendor Specific error: {source}"))]
-    VendorSpecific { ptr: u8, source: vendor_specific::VendorSpecificError },
+    VendorSpecific {
+        ptr: u8,
+        source: vendor_specific::VendorSpecificError,
+    },
+    #[snafu(display("[{ptr:02x}] MSI error: {source}"))]
+    MessageSignaledInterrups {
+        ptr: u8,
+        source: message_signaled_interrups::MessageSignaledInterrupsError,
+    },
 }
 impl From<byte::Error> for CapabilityError {
     fn from(be: byte::Error) -> Self {
@@ -294,38 +308,51 @@ type CapabilityResult<'a> = Result<Capability<'a>, CapabilityError>;
 fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
     let ptr = *pointer;
     // Capability data resides in Device dependent region (starts from 0x40)
-    let offset = (*pointer as usize).checked_sub(DDR_OFFSET)
-        .ok_or_else(|| {
-            *pointer = 0;
-            CapabilityError::Pointer
-        })?;
-    let (id, cap_data) =
-        if let Some([id, next, rest @ .. ]) = bytes.get(offset..) {
-            *pointer = *next;
-            (*id, rest)
-        } else {
-            return Err(CapabilityError::Header { ptr });
-        };
+    let offset = (*pointer as usize).checked_sub(DDR_OFFSET).ok_or_else(|| {
+        *pointer = 0;
+        CapabilityError::Pointer
+    })?;
+    let (id, cap_data) = if let Some([id, next, rest @ ..]) = bytes.get(offset..) {
+        *pointer = *next;
+        (*id, rest)
+    } else {
+        return Err(CapabilityError::Header { ptr });
+    };
     use CapabilityKind as Kind;
     let kind = match id {
         0x00 => Kind::NullCapability,
-        0x01 => cap_data.read_with(&mut 0, LE).map(Kind::PowerManagementInterface)?,
+        0x01 => cap_data
+            .read_with(&mut 0, LE)
+            .map(Kind::PowerManagementInterface)?,
         0x03 => cap_data.read_with(&mut 0, LE).map(Kind::VitalProductData)?,
-        0x04 => cap_data.read_with(&mut 0, LE).map(Kind::SlotIdentification)?,
-        0x05 => cap_data.read_with(&mut 0, LE).map(Kind::MessageSignaledInterrups)?,
+        0x04 => cap_data
+            .read_with(&mut 0, LE)
+            .map(Kind::SlotIdentification)?,
+        0x05 => cap_data
+            .try_into()
+            .map(Kind::MessageSignaledInterrups)
+            .context(MessageSignaledInterrupsSnafu { ptr })?,
         0x06 => Kind::CompactPciHotSwap(CompactPciHotSwap),
         0x08 => cap_data.read_with(&mut 0, LE).map(Kind::Hypertransport)?,
-        0x09 => cap_data.try_into().map(Kind::VendorSpecific)
-                    .context(VendorSpecificSnafu { ptr })?,
+        0x09 => cap_data
+            .try_into()
+            .map(Kind::VendorSpecific)
+            .context(VendorSpecificSnafu { ptr })?,
         0x0a => cap_data.read_with(&mut 0, LE).map(Kind::DebugPort)?,
         0x0b => Kind::CompactPciResourceControl(CompactPciResourceControl),
         0x0c => Kind::PciHotPlug(PciHotPlug),
-        0x0d => cap_data.read_with(&mut 0, LE).map(Kind::BridgeSubsystemVendorId)?,
+        0x0d => cap_data
+            .read_with(&mut 0, LE)
+            .map(Kind::BridgeSubsystemVendorId)?,
         0x0f => Kind::SecureDevice(SecureDevice),
-        0x10 => cap_data.try_into().map(Kind::PciExpress)
-                    .context(PciExpressSnafu { ptr })?,
-        0x11 => cap_data.try_into().map(Kind::MsiX)
-                    .context(DataSnafu { ptr })?,
+        0x10 => cap_data
+            .try_into()
+            .map(Kind::PciExpress)
+            .context(PciExpressSnafu { ptr })?,
+        0x11 => cap_data
+            .try_into()
+            .map(Kind::MsiX)
+            .context(DataSnafu { ptr })?,
         0x12 => cap_data.read_with(&mut 0, LE).map(Kind::Sata)?,
         0x13 => cap_data.read_with(&mut 0, LE).map(Kind::AdvancedFeatures)?,
         v => Kind::Reserved(v),
@@ -378,13 +405,12 @@ pub enum CapabilityKind<'a> {
     Reserved(u8),
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::prelude::v1::*;
-    use pretty_assertions::assert_eq;
-    use crate::ECS_OFFSET;
     use super::*;
+    use crate::ECS_OFFSET;
+    use pretty_assertions::assert_eq;
+    use std::prelude::v1::*;
 
     #[test]
     fn capabilities() {
@@ -394,7 +420,10 @@ mod tests {
         // Capabilities: [80] Vendor Specific Information: Len=14 <?>
         // Capabilities: [60] MSI: Enable+ Count=1/1 Maskable- 64bit+
         //         Address: 00000000fee00578  Data: 0000
-        let data = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/device/8086:9dc8/config"));
+        let data = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/data/device/8086:9dc8/config"
+        ));
         let ddr = &data[DDR_OFFSET..ECS_OFFSET];
         let offset = data[0x34];
         let result = Capabilities::new(ddr, offset).collect::<Vec<_>>();
@@ -402,22 +431,19 @@ mod tests {
             Ok(Capability {
                 pointer: 0x50,
                 kind: CapabilityKind::PowerManagementInterface(
-                    data.read_with(&mut (0x50 + 2), LE).unwrap()
-                )
+                    data.read_with(&mut (0x50 + 2), LE).unwrap(),
+                ),
             }),
             Ok(Capability {
                 pointer: 0x80,
-                kind: CapabilityKind::VendorSpecific(
-                    data[0x80 + 2..].try_into().unwrap()
-                )
+                kind: CapabilityKind::VendorSpecific(data[(0x80 + 2)..].try_into().unwrap()),
             }),
             Ok(Capability {
                 pointer: 0x60,
                 kind: CapabilityKind::MessageSignaledInterrups(
-                    data.read_with(&mut (0x60 + 2), LE).unwrap()
-                )
+                    data[(0x60 + 2)..].try_into().unwrap(),
+                ),
             }),
-
         ];
         assert_eq!(sample, result);
     }
