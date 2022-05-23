@@ -255,6 +255,11 @@ pub enum CapabilityError {
         ptr: u8,
         source: pci_express::PciExpressError,
     },
+    #[snafu(display("[{ptr:02x}] HyperTransport: {source}"))]
+    Hypertransport {
+        ptr: u8,
+        source: hypertransport::HypertransportError,
+    },
     #[snafu(display("[{ptr:02x}] Vendor Specific error: {source}"))]
     VendorSpecific {
         ptr: u8,
@@ -333,7 +338,10 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
             .map(Kind::MessageSignaledInterrups)
             .context(MessageSignaledInterrupsSnafu { ptr })?,
         0x06 => Kind::CompactPciHotSwap(CompactPciHotSwap),
-        0x08 => cap_data.read_with(&mut 0, LE).map(Kind::Hypertransport)?,
+        0x08 => cap_data
+            .try_into()
+            .map(Kind::Hypertransport)
+            .context(HypertransportSnafu { ptr })?,
         0x09 => cap_data
             .try_into()
             .map(Kind::VendorSpecific)
@@ -342,8 +350,9 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
         0x0b => Kind::CompactPciResourceControl(CompactPciResourceControl),
         0x0c => Kind::PciHotPlug(PciHotPlug),
         0x0d => cap_data
-            .read_with(&mut 0, LE)
-            .map(Kind::BridgeSubsystemVendorId)?,
+            .try_into()
+            .map(Kind::BridgeSubsystemVendorId)
+            .context(DataSnafu { ptr })?,
         0x0f => Kind::SecureDevice(SecureDevice),
         0x10 => cap_data
             .try_into()

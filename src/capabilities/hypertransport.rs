@@ -23,21 +23,31 @@
 //! - [ ] Power Management
 //! - [ ] High Node Count
 
-use modular_bitfield::prelude::*;
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
-};
+use heterob::{bit_numbering::Lsb, endianness::Le, P10, P11, P13, P16, P17, P2, P3, P5, P6, P8};
+use snafu::Snafu;
 
-use crate::capabilities::CAP_HEADER_LEN;
-
-/// For the primary and secondary interface capability blocks, there are 3 bits (15:13) used in the
-/// encoding. For all other HyperTransport capability blocks, 5 bits (15:11) are used.
-const HT_CAP_TYPE_MASK: u16 = 0xf800;
-
+/// HyperTransport errors
+#[derive(Snafu, Debug, Clone, PartialEq, Eq)]
+pub enum HypertransportError {
+    CapabilityType,
+    SlaveOrPrimaryInterface,
+    HostOrSecondaryInterface,
+    Switch,
+    ReservedHost,
+    InterruptDiscoveryAndConfiguration,
+    RevisionId,
+    UnitIdClumping,
+    ExtendedConfigurationSpaceAccess,
+    AddressMapping,
+    MsiMapping,
+    DirectRoute,
+    VCSet,
+    X86Encoding,
+    Gen3,
+    FunctionLevelExtension,
+    PowerManagement,
+    HighNodeCount,
+}
 
 /// The layout of the capabilities block is determined by the value in the Capability Type field in
 /// the Command register
@@ -82,116 +92,86 @@ pub enum Hypertransport {
     /// Reserved
     Reserved(u8),
 }
-impl<'a> TryRead<'a, Endian> for Hypertransport {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let word = bytes.read_with::<u16>(&mut 0, endian)?;
-        let capability_type = (word & HT_CAP_TYPE_MASK) >> 11;
-        let offset = &mut 0;
-        let ht = match capability_type {
-            0b00000..=0b00011 => {
-                let data = bytes.read_with::<SlaveOrPrimaryInterface>(offset, endian)?;
-                Self::SlaveOrPrimaryInterface(data)
-            },
-            0b00100..=0b00111 => {
-                let data = bytes.read_with::<HostOrSecondaryInterface>(offset, endian)?;
-                Self::HostOrSecondaryInterface(data)
-            },
-            0b01000           => {
-                // let data = bytes.read_with::<Switch>(offset, endian)?;
-                Self::Switch(Switch {})
-            },
-            0b01001           => {
-                // let data = bytes.read_with::<ReservedHost>(offset, endian)?;
-                Self::ReservedHost(ReservedHost {})
-            },
-            0b10000           => {
-                // let data = bytes.read_with::<InterruptDiscoveryAndConfiguration>(offset, endian)?;
+impl<'a> TryFrom<&'a [u8]> for Hypertransport {
+    type Error = HypertransportError;
+
+    fn try_from(slice: &'a [u8]) -> Result<Self, Self::Error> {
+        let cmd = slice
+            .get(..2)
+            .and_then(|slice| <[u8; 2]>::try_from(slice).ok())
+            .map(u16::from_le_bytes)
+            .ok_or(HypertransportError::CapabilityType)?;
+        // For the primary and secondary interface capability blocks,
+        // there are 3 bits (15:13) used in the encoding.
+        // For all other HyperTransport capability blocks, 5 bits (15:11) are used.
+        let Lsb(((), capability_type)) = P2::<u16, 11, 5>(cmd).into();
+        let _: u8 = capability_type;
+        Ok(match capability_type {
+            0b00000..=0b00011 => slice
+                .get(..SlaveOrPrimaryInterface::SIZE)
+                .and_then(|slice| <[u8; SlaveOrPrimaryInterface::SIZE]>::try_from(slice).ok())
+                .map(|data| Self::SlaveOrPrimaryInterface(data.into()))
+                .ok_or(HypertransportError::SlaveOrPrimaryInterface)?,
+            0b00100..=0b00111 => slice
+                .get(..HostOrSecondaryInterface::SIZE)
+                .and_then(|slice| <[u8; HostOrSecondaryInterface::SIZE]>::try_from(slice).ok())
+                .map(|data| Self::HostOrSecondaryInterface(data.into()))
+                .ok_or(HypertransportError::HostOrSecondaryInterface)?,
+            0b01000 => Self::Switch(Switch {}),
+            0b01001 => Self::ReservedHost(ReservedHost {}),
+            0b10000 => {
                 Self::InterruptDiscoveryAndConfiguration(InterruptDiscoveryAndConfiguration {})
-            },
-            0b10001           => {
-                let data = bytes.read_with::<u8>(offset, endian)?.into();
-                Self::RevisionId(data)
-            },
-            0b10010           => {
-                // let data = bytes.read_with::<UnitIdClumping>(offset, endian)?;
-                Self::UnitIdClumping(UnitIdClumping {})
-            },
-            0b10011           => {
-                // let data = bytes.read_with::<ExtendedConfigurationSpaceAccess>(offset, endian)?;
-                Self::ExtendedConfigurationSpaceAccess(ExtendedConfigurationSpaceAccess {})
-            },
-            0b10100           => {
-                // let data = bytes.read_with::<AddressMapping>(offset, endian)?;
-                Self::AddressMapping(AddressMapping {})
-            },
-            0b10101           => {
-                let data = bytes.read_with::<MsiMapping>(offset, endian)?;
-                Self::MsiMapping(data)
-            },
-            0b10110           => {
-                // let data = bytes.read_with::<DirectRoute>(offset, endian)?;
-                Self::DirectRoute(DirectRoute {})
-            },
-            0b10111           => {
-                // let data = bytes.read_with::<VCSet>(offset, endian)?;
-                Self::VCSet(VCSet {})
-            },
-            0b11000           => {
-                // let data = bytes.read_with::<RetryMode>(offset, endian)?;
-                Self::RetryMode(RetryMode {})
-            },
-            0b11001           => {
-                // let data = bytes.read_with::<X86Encoding>(offset, endian)?;
-                Self::X86Encoding(X86Encoding {})
-            },
-            0b11010           => {
-                // let data = bytes.read_with::<Gen3>(offset, endian)?;
-                Self::Gen3(Gen3 {})
-            },
-            0b11011           => {
-                // let data = bytes.read_with::<FunctionLevelExtension>(offset, endian)?;
-                Self::FunctionLevelExtension(FunctionLevelExtension {})
-            },
-            0b11100           => {
-                // let data = bytes.read_with::<PowerManagement>(offset, endian)?;
-                Self::PowerManagement(PowerManagement {})
-            },
-            0b11101           => {
-                // let data = bytes.read_with::<HighNodeCount>(offset, endian)?;
-                Self::HighNodeCount(HighNodeCount {})
-            },
+            }
+            0b10001 => slice
+                .get(0)
+                .map(|&data| Self::RevisionId(data.into()))
+                .ok_or(HypertransportError::RevisionId)?,
+            0b10010 => Self::UnitIdClumping(UnitIdClumping {}),
+            0b10011 => Self::ExtendedConfigurationSpaceAccess(ExtendedConfigurationSpaceAccess {}),
+            0b10100 => Self::AddressMapping(AddressMapping {}),
+            0b10101 => slice
+                .get(..MsiMapping::SIZE)
+                .and_then(|slice| <[u8; MsiMapping::SIZE]>::try_from(slice).ok())
+                .map(|data| Self::MsiMapping(data.into()))
+                .ok_or(HypertransportError::MsiMapping)?,
+            0b10110 => Self::DirectRoute(DirectRoute {}),
+            0b10111 => Self::VCSet(VCSet {}),
+            0b11000 => Self::RetryMode(RetryMode {}),
+            0b11001 => Self::X86Encoding(X86Encoding {}),
+            0b11010 => Self::Gen3(Gen3 {}),
+            0b11011 => Self::FunctionLevelExtension(FunctionLevelExtension {}),
+            0b11100 => Self::PowerManagement(PowerManagement {}),
+            0b11101 => Self::HighNodeCount(HighNodeCount {}),
             v => Self::Reserved(v as u8),
-        };
-        Ok((ht, *offset))
+        })
     }
 }
+
 impl<'a> From<&'a Hypertransport> for u8 {
     fn from(ht: &'a Hypertransport) -> Self {
         match ht {
-            Hypertransport::SlaveOrPrimaryInterface(_)            => 0b00000,
-            Hypertransport::HostOrSecondaryInterface(_)           => 0b00100,
-            Hypertransport::Switch(_)                             => 0b01000,
-            Hypertransport::ReservedHost(_)                       => 0b01001,
+            Hypertransport::SlaveOrPrimaryInterface(_) => 0b00000,
+            Hypertransport::HostOrSecondaryInterface(_) => 0b00100,
+            Hypertransport::Switch(_) => 0b01000,
+            Hypertransport::ReservedHost(_) => 0b01001,
             Hypertransport::InterruptDiscoveryAndConfiguration(_) => 0b10000,
-            Hypertransport::RevisionId(_)                         => 0b10001,
-            Hypertransport::UnitIdClumping(_)                     => 0b10010,
-            Hypertransport::ExtendedConfigurationSpaceAccess(_)   => 0b10011,
-            Hypertransport::AddressMapping(_)                     => 0b10100,
-            Hypertransport::MsiMapping(_)                         => 0b10101,
-            Hypertransport::DirectRoute(_)                        => 0b10110,
-            Hypertransport::VCSet(_)                              => 0b10111,
-            Hypertransport::RetryMode(_)                          => 0b11000,
-            Hypertransport::X86Encoding(_)                        => 0b11001,
-            Hypertransport::Gen3(_)                               => 0b11010,
-            Hypertransport::FunctionLevelExtension(_)             => 0b11011,
-            Hypertransport::PowerManagement(_)                    => 0b11100,
-            Hypertransport::HighNodeCount(_)                      => 0b11101,
-            Hypertransport::Reserved(v)                           => *v,
+            Hypertransport::RevisionId(_) => 0b10001,
+            Hypertransport::UnitIdClumping(_) => 0b10010,
+            Hypertransport::ExtendedConfigurationSpaceAccess(_) => 0b10011,
+            Hypertransport::AddressMapping(_) => 0b10100,
+            Hypertransport::MsiMapping(_) => 0b10101,
+            Hypertransport::DirectRoute(_) => 0b10110,
+            Hypertransport::VCSet(_) => 0b10111,
+            Hypertransport::RetryMode(_) => 0b11000,
+            Hypertransport::X86Encoding(_) => 0b11001,
+            Hypertransport::Gen3(_) => 0b11010,
+            Hypertransport::FunctionLevelExtension(_) => 0b11011,
+            Hypertransport::PowerManagement(_) => 0b11100,
+            Hypertransport::HighNodeCount(_) => 0b11101,
+            Hypertransport::Reserved(v) => *v,
         }
     }
 }
-
-
 
 /// Slave/Primary Interface
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -234,6 +214,7 @@ pub struct SlaveOrPrimaryInterface {
     pub bus_number: u8,
 }
 impl SlaveOrPrimaryInterface {
+    pub const SIZE: usize = 26;
     pub fn link_freq_0(&self, link_freq_ext: bool) -> LinkFrequency {
         LinkFrequency::new(link_freq_ext, self.link_freq_0)
     }
@@ -241,53 +222,65 @@ impl SlaveOrPrimaryInterface {
         LinkFrequency::new(link_freq_ext, self.link_freq_1)
     }
 }
-impl<'a> TryRead<'a, Endian> for SlaveOrPrimaryInterface {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let link_freq_err_proto_0: LinkFreqErrProto =
-            bytes.read_with::<u8>(&mut (0x0d - CAP_HEADER_LEN), endian)?.into();
-        let link_freq_err_proto_1: LinkFreqErrProto =
-            bytes.read_with::<u8>(&mut (0x11 - CAP_HEADER_LEN), endian)?.into();
-        let sopi = SlaveOrPrimaryInterface {
-            command: bytes.read_with::<u16>(offset, endian)?.into(),
-            link_control_0: bytes.read_with::<u16>(offset, endian)?.into(),
-            link_config_0: bytes.read_with::<u16>(offset, endian)?.into(),
-            link_control_1: bytes.read_with::<u16>(offset, endian)?.into(),
-            link_config_1: bytes.read_with::<u16>(offset, endian)?.into(),
-            revision_id: bytes.read_with::<u8>(offset, endian)?.into(),
-            link_freq_0: {
-                *offset += 1; // link_freq_err_proto_0 skipped
-                link_freq_err_proto_0.link_freq()
-            },
-            link_error_0: link_freq_err_proto_0.into(),
-            link_freq_cap_0: bytes.read_with::<u16>(offset, endian)?.into(),
-            feature: (bytes.read_with::<u8>(offset, endian)? as u16).into(),
-            link_freq_1: {
-                *offset += 1; // link_freq_err_proto_1 skipped
-                link_freq_err_proto_1.link_freq()
-            },
-            link_error_1: link_freq_err_proto_1.into(),
-            link_freq_cap_1: bytes.read_with::<u16>(offset, endian)?.into(),
-            enumeration_scratchpad: bytes.read_with::<u16>(offset, endian)?,
-            error_handling: bytes.read_with::<u16>(offset, endian)?.into(),
-            mem_base_upper: bytes.read_with::<u8>(offset, endian)?,
-            mem_limit_upper: bytes.read_with::<u8>(offset, endian)?,
-            bus_number: bytes.read_with::<u8>(offset, endian)?,
+impl<'a> From<[u8; Self::SIZE]> for SlaveOrPrimaryInterface {
+    fn from(bytes: [u8; Self::SIZE]) -> Self {
+        let Le((
+            command,
+            link_control_0,
+            link_config_0,
+            link_control_1,
+            link_config_1,
+            revision_id,
+            link_freq_err_0,
+            link_freq_cap_0,
+            feature,
+            link_freq_err_1,
+            link_freq_cap_1,
+            enumeration_scratchpad,
+            error_handling,
+            mem_base_upper,
+            mem_limit_upper,
+            bus_number,
+            rsvd,
+        )) = P17(bytes).into();
+        let _: (u8, u8) = (feature, rsvd);
+        let Lsb((link_freq_0, protocol_error, overflow_error, end_of_chain_error, ctl_timeout)) =
+            P5::<u8, 4, 1, 1, 1, 1>(link_freq_err_0).into();
+        let link_error_0 = LinkError {
+            protocol_error,
+            overflow_error,
+            end_of_chain_error,
+            ctl_timeout,
         };
-        Ok((sopi, *offset))
+        let Lsb((link_freq_1, protocol_error, overflow_error, end_of_chain_error, ctl_timeout)) =
+            P5::<u8, 4, 1, 1, 1, 1>(link_freq_err_1).into();
+        let link_error_1 = LinkError {
+            protocol_error,
+            overflow_error,
+            end_of_chain_error,
+            ctl_timeout,
+        };
+        Self {
+            command: From::<u16>::from(command),
+            link_control_0: From::<u16>::from(link_control_0),
+            link_config_0: From::<u16>::from(link_config_0),
+            link_control_1: From::<u16>::from(link_control_1),
+            link_config_1: From::<u16>::from(link_config_1),
+            revision_id: From::<u8>::from(revision_id),
+            link_freq_0: From::<u8>::from(link_freq_0),
+            link_error_0,
+            link_freq_cap_0: From::<u16>::from(link_freq_cap_0),
+            feature: (feature as u16).into(),
+            link_freq_1: From::<u8>::from(link_freq_1),
+            link_error_1,
+            link_freq_cap_1: From::<u16>::from(link_freq_cap_1),
+            enumeration_scratchpad: From::<u16>::from(enumeration_scratchpad),
+            error_handling: From::<u16>::from(error_handling),
+            mem_base_upper,
+            mem_limit_upper,
+            bus_number,
+        }
     }
-}
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct SlaveOrPrimaryCommandProto {
-    base_unitid: B5,
-    unit_count: B5,
-    master_host: bool,
-    default_direction: bool,
-    drop_on_uninitialized_link: bool,
-    capability_type: B3,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -303,39 +296,25 @@ pub struct SlaveOrPrimaryCommand {
     /// Drop on Uninitialized Link
     pub drop_on_uninitialized_link: bool,
 }
-impl From<SlaveOrPrimaryCommandProto> for SlaveOrPrimaryCommand {
-    fn from(proto: SlaveOrPrimaryCommandProto) -> Self {
-        let _ = proto.capability_type();
+
+impl From<u16> for SlaveOrPrimaryCommand {
+    fn from(word: u16) -> Self {
+        let Lsb((
+            base_unitid,
+            unit_count,
+            master_host,
+            default_direction,
+            drop_on_uninitialized_link,
+            (),
+        )) = P6::<_, 5, 5, 1, 1, 1, 3>(word).into();
         Self {
-            base_unitid: proto.base_unitid(),
-            unit_count: proto.unit_count(),
-            master_host: proto.master_host(),
-            default_direction: proto.default_direction(),
-            drop_on_uninitialized_link: proto.drop_on_uninitialized_link(),
+            base_unitid,
+            unit_count,
+            master_host,
+            default_direction,
+            drop_on_uninitialized_link,
         }
     }
-}
-impl From<u16> for SlaveOrPrimaryCommand {
-    fn from(word: u16) -> Self { SlaveOrPrimaryCommandProto::from(word).into() }
-}
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct LinkControlProto {
-    source_id_enable: bool,
-    crc_flood_enable: bool,
-    crc_start_test: bool,
-    crc_force_error: bool,
-    link_failure: bool,
-    initialization_complete: bool,
-    end_of_chain: bool,
-    transmitter_off: bool,
-    crc_error: B4,
-    isochronous_flow_control_enable: bool,
-    ldtstop_tristate_enable: bool,
-    extended_ctl_time: bool,
-    enable_64_bit_addressing: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -367,41 +346,40 @@ pub struct LinkControl {
     /// 64 Bit Addressing Enable
     pub enable_64_bit_addressing: bool,
 }
-impl From<LinkControlProto> for LinkControl {
-    fn from(proto: LinkControlProto) -> Self {
-       Self {
-           source_id_enable: proto.source_id_enable(),
-           crc_flood_enable: proto.crc_flood_enable(),
-           crc_start_test: proto.crc_start_test(),
-           crc_force_error: proto.crc_force_error(),
-           link_failure: proto.link_failure(),
-           initialization_complete: proto.initialization_complete(),
-           end_of_chain: proto.end_of_chain(),
-           transmitter_off: proto.transmitter_off(),
-           crc_error: proto.crc_error(),
-           isochronous_flow_control_enable: proto.isochronous_flow_control_enable(),
-           ldtstop_tristate_enable: proto.ldtstop_tristate_enable(),
-           extended_ctl_time: proto.extended_ctl_time(),
-           enable_64_bit_addressing: proto.enable_64_bit_addressing(),
+
+impl From<u16> for LinkControl {
+    fn from(word: u16) -> Self {
+        let Lsb((
+            source_id_enable,
+            crc_flood_enable,
+            crc_start_test,
+            crc_force_error,
+            link_failure,
+            initialization_complete,
+            end_of_chain,
+            transmitter_off,
+            crc_error,
+            isochronous_flow_control_enable,
+            ldtstop_tristate_enable,
+            extended_ctl_time,
+            enable_64_bit_addressing,
+        )) = P13::<_, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 1>(word).into();
+        Self {
+            source_id_enable,
+            crc_flood_enable,
+            crc_start_test,
+            crc_force_error,
+            link_failure,
+            initialization_complete,
+            end_of_chain,
+            transmitter_off,
+            crc_error,
+            isochronous_flow_control_enable,
+            ldtstop_tristate_enable,
+            extended_ctl_time,
+            enable_64_bit_addressing,
         }
     }
-}
-impl From<u16> for LinkControl {
-    fn from(word: u16) -> Self { LinkControlProto::from(word).into() }
-}
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct LinkConfigurationProto {
-    max_link_width_in: B3,
-    doubleword_flow_control_in: bool,
-    max_link_width_out: B3,
-    doubleword_flow_control_out: bool,
-    link_width_in: B3,
-    doubleword_flow_control_in_enable: bool,
-    link_width_out: B3,
-    doubleword_flow_control_out_enable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -423,24 +401,31 @@ pub struct LinkConfiguration {
     /// Doubleword Flow Control Out Enable
     pub doubleword_flow_control_out_enable: bool,
 }
-impl From<LinkConfigurationProto> for LinkConfiguration {
-    fn from(proto: LinkConfigurationProto) -> Self {
-       Self {
-           max_link_width_in: proto.max_link_width_in().into(),
-           doubleword_flow_control_in: proto.doubleword_flow_control_in(),
-           max_link_width_out: proto.max_link_width_out().into(),
-           doubleword_flow_control_out: proto.doubleword_flow_control_out(),
-           link_width_in: proto.link_width_in().into(),
-           doubleword_flow_control_in_enable: proto.doubleword_flow_control_in_enable(),
-           link_width_out: proto.link_width_out().into(),
-           doubleword_flow_control_out_enable: proto.doubleword_flow_control_out_enable(),
+
+impl From<u16> for LinkConfiguration {
+    fn from(word: u16) -> Self {
+        let Lsb((
+            max_link_width_in,
+            doubleword_flow_control_in,
+            max_link_width_out,
+            doubleword_flow_control_out,
+            link_width_in,
+            doubleword_flow_control_in_enable,
+            link_width_out,
+            doubleword_flow_control_out_enable,
+        )) = P8::<_, 3, 1, 3, 1, 3, 1, 3, 1>(word).into();
+        Self {
+            max_link_width_in: From::<u8>::from(max_link_width_in),
+            doubleword_flow_control_in,
+            max_link_width_out: From::<u8>::from(max_link_width_out),
+            doubleword_flow_control_out,
+            link_width_in: From::<u8>::from(link_width_in),
+            doubleword_flow_control_in_enable,
+            link_width_out: From::<u8>::from(link_width_out),
+            doubleword_flow_control_out_enable,
         }
     }
 }
-impl From<u16> for LinkConfiguration {
-    fn from(word: u16) -> Self { LinkConfigurationProto::from(word).into() }
-}
-
 
 /// Indicate the physical width of the incoming side of the HyperTransport link implemented by this
 /// device. Unganged links indicate a maximum width of 8 bits.
@@ -480,53 +465,24 @@ impl Default for LinkWidth {
     }
 }
 
-
-#[bitfield(bits = 8)]
-#[repr(u8)]
-pub struct RevisionIdProto {
-    minor: B5,
-    major: B3,
-}
-impl<'a> From<&'a RevisionId> for RevisionIdProto {
-    fn from(data: &'a RevisionId) -> Self {
-        RevisionIdProto::new()
-            .with_minor(data.minor)
-            .with_major(data.major)
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RevisionId {
     pub minor: u8,
     pub major: u8,
 }
-impl From<RevisionIdProto> for RevisionId {
-    fn from(proto: RevisionIdProto) -> Self {
-        Self {
-            minor: proto.minor(),
-            major: proto.major(),
-        }
-    }
+impl RevisionId {
+    pub const SIZE: usize = 1;
 }
 impl From<u8> for RevisionId {
-    fn from(byte: u8) -> Self { RevisionIdProto::from(byte).into() }
+    fn from(byte: u8) -> Self {
+        let Lsb((minor, major)) = P2::<_, 5, 3>(byte).into();
+        Self { minor, major }
+    }
 }
 impl<'a> From<&'a RevisionId> for u8 {
     fn from(data: &'a RevisionId) -> Self {
-        RevisionIdProto::from(data).into()
+        (data.major << 5) | (data.minor & 0b11111)
     }
-}
-
-
-#[bitfield(bits = 8)]
-#[repr(u8)]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LinkFreqErrProto {
-    link_freq: B4,
-    protocol_error: bool,
-    overflow_error: bool,
-    end_of_chain_error: bool,
-    ctl_timeout: bool,
 }
 
 /// The Link Frequency register specifies the operating frequency of the link’s transmitter
@@ -575,17 +531,18 @@ impl LinkFrequency {
             (false, 0b1101) => Self::Rate2400MHz,
             (false, 0b1110) => Self::Rate2600MHz,
             (false, 0b1111) => Self::VendorSpecific,
-            (true, 0b0001)  => Self::Rate2800MHz,
-            (true, 0b0010)  => Self::Rate3000MHz,
-            (true, 0b0011)  => Self::Rate3200MHz,
+            (true, 0b0001) => Self::Rate2800MHz,
+            (true, 0b0010) => Self::Rate3000MHz,
+            (true, 0b0011) => Self::Rate3200MHz,
             (b, v) => Self::Reserved((v & 0b1111) | ((b as u8) << 4)),
         }
     }
 }
 impl Default for LinkFrequency {
-    fn default() -> Self { Self::Rate200MHz }
+    fn default() -> Self {
+        Self::Rate200MHz
+    }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkError {
@@ -597,38 +554,6 @@ pub struct LinkError {
     pub end_of_chain_error: bool,
     /// CTL Timeout
     pub ctl_timeout: bool,
-}
-impl From<LinkFreqErrProto> for LinkError {
-    fn from(proto: LinkFreqErrProto) -> Self {
-        Self {
-            protocol_error: proto.protocol_error(),
-            overflow_error: proto.overflow_error(),
-            end_of_chain_error: proto.end_of_chain_error(),
-            ctl_timeout: proto.ctl_timeout(),
-        }
-    }
-}
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct LinkFrequencyCapabilityProto {
-    supports_200mhz: bool,
-    supports_300mhz: bool,
-    supports_400mhz: bool,
-    supports_500mhz: bool,
-    supports_600mhz: bool,
-    supports_800mhz: bool,
-    supports_1000mhz: bool,
-    supports_1200mhz: bool,
-    supports_1400mhz: bool,
-    supports_1600mhz: bool,
-    supports_1800mhz: bool,
-    supports_2000mhz: bool,
-    supports_2200mhz: bool,
-    supports_2400mhz: bool,
-    supports_2600mhz: bool,
-    supports_vendor_specific: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -650,47 +575,46 @@ pub struct LinkFrequencyCapability {
     pub supports_2600mhz: bool,
     pub supports_vendor_specific: bool,
 }
-impl From<LinkFrequencyCapabilityProto> for LinkFrequencyCapability {
-    fn from(proto: LinkFrequencyCapabilityProto) -> Self {
+
+impl From<u16> for LinkFrequencyCapability {
+    fn from(word: u16) -> Self {
+        let Lsb((
+            supports_200mhz,
+            supports_300mhz,
+            supports_400mhz,
+            supports_500mhz,
+            supports_600mhz,
+            supports_800mhz,
+            supports_1000mhz,
+            supports_1200mhz,
+            supports_1400mhz,
+            supports_1600mhz,
+            supports_1800mhz,
+            supports_2000mhz,
+            supports_2200mhz,
+            supports_2400mhz,
+            supports_2600mhz,
+            supports_vendor_specific,
+        )) = P16::<_, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1>(word).into();
         Self {
-            supports_200mhz: proto.supports_200mhz(),
-            supports_300mhz: proto.supports_300mhz(),
-            supports_400mhz: proto.supports_400mhz(),
-            supports_500mhz: proto.supports_500mhz(),
-            supports_600mhz: proto.supports_600mhz(),
-            supports_800mhz: proto.supports_800mhz(),
-            supports_1000mhz: proto.supports_1000mhz(),
-            supports_1200mhz: proto.supports_1200mhz(),
-            supports_1400mhz: proto.supports_1400mhz(),
-            supports_1600mhz: proto.supports_1600mhz(),
-            supports_1800mhz: proto.supports_1800mhz(),
-            supports_2000mhz: proto.supports_2000mhz(),
-            supports_2200mhz: proto.supports_2200mhz(),
-            supports_2400mhz: proto.supports_2400mhz(),
-            supports_2600mhz: proto.supports_2600mhz(),
-            supports_vendor_specific: proto.supports_vendor_specific(),
+            supports_200mhz,
+            supports_300mhz,
+            supports_400mhz,
+            supports_500mhz,
+            supports_600mhz,
+            supports_800mhz,
+            supports_1000mhz,
+            supports_1200mhz,
+            supports_1400mhz,
+            supports_1600mhz,
+            supports_1800mhz,
+            supports_2000mhz,
+            supports_2200mhz,
+            supports_2400mhz,
+            supports_2600mhz,
+            supports_vendor_specific,
         }
     }
-}
-impl From<u16> for LinkFrequencyCapability {
-    fn from(word: u16) -> Self { LinkFrequencyCapabilityProto::from(word).into() }
-}
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct FeatureCapabilityProto {
-    isochronous_flow_control_mode: bool,
-    ldtstop: bool,
-    crc_test_mode: bool,
-    extended_ctl_time_required: bool,
-    qword_addressing: bool,
-    unitid_reorder_disable: bool,
-    source_identification_extension: bool,
-    rsvdp: B1,
-    extended_register_set: bool,
-    upstream_configuration_enable: bool,
-    rsvdp_2: B6,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -714,47 +638,34 @@ pub struct FeatureCapability {
     /// Upstream Configuration Enable
     pub upstream_configuration_enable: bool,
 }
-impl From<FeatureCapabilityProto> for FeatureCapability {
-    fn from(proto: FeatureCapabilityProto) -> Self {
-        let _ = proto.rsvdp();
-        let _ = proto.rsvdp_2();
+
+impl From<u16> for FeatureCapability {
+    fn from(word: u16) -> Self {
+        let Lsb((
+            isochronous_flow_control_mode,
+            ldtstop,
+            crc_test_mode,
+            extended_ctl_time_required,
+            qword_addressing,
+            unitid_reorder_disable,
+            source_identification_extension,
+            (),
+            extended_register_set,
+            upstream_configuration_enable,
+            (),
+        )) = P11::<_, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 6>(word).into();
         Self {
-            isochronous_flow_control_mode: proto.isochronous_flow_control_mode(),
-            ldtstop: proto.ldtstop(),
-            crc_test_mode: proto.crc_test_mode(),
-            extended_ctl_time_required: proto.extended_ctl_time_required(),
-            qword_addressing: proto.qword_addressing(),
-            unitid_reorder_disable: proto.unitid_reorder_disable(),
-            source_identification_extension: proto.source_identification_extension(),
-            extended_register_set: proto.extended_register_set(),
-            upstream_configuration_enable: proto.upstream_configuration_enable(),
+            isochronous_flow_control_mode,
+            ldtstop,
+            crc_test_mode,
+            extended_ctl_time_required,
+            qword_addressing,
+            unitid_reorder_disable,
+            source_identification_extension,
+            extended_register_set,
+            upstream_configuration_enable,
         }
     }
-}
-impl From<u16> for FeatureCapability {
-    fn from(word: u16) -> Self { FeatureCapabilityProto::from(word).into() }
-}
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct ErrorHandlingProto {
-    protocol_error_flood_enable: bool,
-    overflow_error_flood_enable: bool,
-    protocol_error_fatal_enable: bool,
-    overflow_error_fatal_enable: bool,
-    end_of_chain_error_fatal_enable: bool,
-    response_error_fatal_enable: bool,
-    crc_error_fatal_enable: bool,
-    system_error_fatal_enable: bool,
-    chain_fail: bool,
-    response_error: bool,
-    protocol_error_nonfatal_enable: bool,
-    overflow_error_nonfatal_enable: bool,
-    end_of_chain_error_nonfatal_enable: bool,
-    response_error_nonfatal_enable: bool,
-    crc_error_nonfatal_enable: bool,
-    system_error_nonfatal_enable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -792,33 +703,47 @@ pub struct ErrorHandling {
     /// System Error Nonfatal Enable
     pub system_error_nonfatal_enable: bool,
 }
-impl From<ErrorHandlingProto> for ErrorHandling {
-    fn from(proto: ErrorHandlingProto) -> Self {
+
+impl From<u16> for ErrorHandling {
+    fn from(word: u16) -> Self {
+        let Lsb((
+            protocol_error_flood_enable,
+            overflow_error_flood_enable,
+            protocol_error_fatal_enable,
+            overflow_error_fatal_enable,
+            end_of_chain_error_fatal_enable,
+            response_error_fatal_enable,
+            crc_error_fatal_enable,
+            system_error_fatal_enable,
+            chain_fail,
+            response_error,
+            protocol_error_nonfatal_enable,
+            overflow_error_nonfatal_enable,
+            end_of_chain_error_nonfatal_enable,
+            response_error_nonfatal_enable,
+            crc_error_nonfatal_enable,
+            system_error_nonfatal_enable,
+        )) = P16::<_, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1>(word).into();
         Self {
-            protocol_error_flood_enable: proto.protocol_error_flood_enable(),
-            overflow_error_flood_enable: proto.overflow_error_flood_enable(),
-            protocol_error_fatal_enable: proto.protocol_error_fatal_enable(),
-            overflow_error_fatal_enable: proto.overflow_error_fatal_enable(),
-            end_of_chain_error_fatal_enable: proto.end_of_chain_error_fatal_enable(),
-            response_error_fatal_enable: proto.response_error_fatal_enable(),
-            crc_error_fatal_enable: proto.crc_error_fatal_enable(),
-            system_error_fatal_enable: proto.system_error_fatal_enable(),
-            chain_fail: proto.chain_fail(),
-            response_error: proto.response_error(),
-            protocol_error_nonfatal_enable: proto.protocol_error_nonfatal_enable(),
-            overflow_error_nonfatal_enable: proto.overflow_error_nonfatal_enable(),
-            end_of_chain_error_nonfatal_enable: proto.end_of_chain_error_nonfatal_enable(),
-            response_error_nonfatal_enable: proto.response_error_nonfatal_enable(),
-            crc_error_nonfatal_enable: proto.crc_error_nonfatal_enable(),
-            system_error_nonfatal_enable: proto.system_error_nonfatal_enable(),
+            protocol_error_flood_enable,
+            overflow_error_flood_enable,
+            protocol_error_fatal_enable,
+            overflow_error_fatal_enable,
+            end_of_chain_error_fatal_enable,
+            response_error_fatal_enable,
+            crc_error_fatal_enable,
+            system_error_fatal_enable,
+            chain_fail,
+            response_error,
+            protocol_error_nonfatal_enable,
+            overflow_error_nonfatal_enable,
+            end_of_chain_error_nonfatal_enable,
+            response_error_nonfatal_enable,
+            crc_error_nonfatal_enable,
+            system_error_nonfatal_enable,
         }
     }
 }
-impl From<u16> for ErrorHandling {
-    fn from(word: u16) -> Self { ErrorHandlingProto::from(word).into() }
-}
-
-
 
 /// Host/Secondary Interface
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -850,53 +775,52 @@ pub struct HostOrSecondaryInterface {
 }
 
 impl HostOrSecondaryInterface {
+    pub const SIZE: usize = 22;
     pub fn link_freq(&self, link_freq_ext: bool) -> LinkFrequency {
         LinkFrequency::new(link_freq_ext, self.link_freq)
     }
 }
-impl<'a> TryRead<'a, Endian> for HostOrSecondaryInterface {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let link_freq_err_proto: LinkFreqErrProto =
-            bytes.read_with::<u8>(&mut (0x09 - CAP_HEADER_LEN), endian)?.into();
-        let hosi = HostOrSecondaryInterface {
-            command: bytes.read_with::<u16>(offset, endian)?.into(),
-            link_control: bytes.read_with::<u16>(offset, endian)?.into(),
-            link_config: bytes.read_with::<u16>(offset, endian)?.into(),
-            revision_id: bytes.read_with::<u8>(offset, endian)?.into(),
-            link_freq: link_freq_err_proto.link_freq(),
-            link_error: link_freq_err_proto.into(),
-            link_freq_cap: {
-                *offset += 1; // link_freq_err_proto skipped
-                bytes.read_with::<u16>(offset, endian)?.into()
-            },
-            feature: bytes.read_with::<u16>(offset, endian)?.into(),
-            enumeration_scratchpad: {
-                let _reserved = bytes.read_with::<u16>(offset, endian)?;
-                bytes.read_with::<u16>(offset, endian)?
-            },
-            error_handling: bytes.read_with::<u16>(offset, endian)?.into(),
-            mem_base_upper: bytes.read_with::<u8>(offset, endian)?,
-            mem_limit_upper: bytes.read_with::<u8>(offset, endian)?,
+impl<'a> From<[u8; Self::SIZE]> for HostOrSecondaryInterface {
+    fn from(bytes: [u8; Self::SIZE]) -> Self {
+        let Le((
+            command,
+            link_control,
+            link_config,
+            revision_id,
+            link_freq_err,
+            link_freq_cap,
+            feature,
+            rsvd_0,
+            enumeration_scratchpad,
+            error_handling,
+            mem_base_upper,
+            mem_limit_upper,
+            rsvd_1,
+        )) = P13(bytes).into();
+        let _: (u16, u16) = (rsvd_0, rsvd_1);
+        let Lsb((link_freq, protocol_error, overflow_error, end_of_chain_error, ctl_timeout)) =
+            P5::<u8, 4, 1, 1, 1, 1>(link_freq_err).into();
+        let link_error = LinkError {
+            protocol_error,
+            overflow_error,
+            end_of_chain_error,
+            ctl_timeout,
         };
-        Ok((hosi, *offset))
+        Self {
+            command: From::<u16>::from(command),
+            link_control: From::<u16>::from(link_control),
+            link_config: From::<u16>::from(link_config),
+            revision_id: From::<u8>::from(revision_id),
+            link_freq: From::<u8>::from(link_freq),
+            link_error,
+            link_freq_cap: From::<u16>::from(link_freq_cap),
+            feature: From::<u16>::from(feature),
+            enumeration_scratchpad: From::<u16>::from(enumeration_scratchpad),
+            error_handling: From::<u16>::from(error_handling),
+            mem_base_upper,
+            mem_limit_upper,
+        }
     }
-}
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct HostOrSecondaryCommandProto {
-    warm_reset: bool,
-    double_ended: bool,
-    device_number: B5,
-    chain_side: bool,
-    host_hide: bool,
-    rsvdp: B1,
-    act_as_slave: bool,
-    host_inbound_end_of_chain_error: bool,
-    drop_on_uninitialized_link: bool,
-    capability_type: B3,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -918,61 +842,51 @@ pub struct HostOrSecondaryCommand {
     /// Drop on Uninitialized Link
     pub drop_on_uninitialized_link: bool,
 }
-impl From<HostOrSecondaryCommandProto> for HostOrSecondaryCommand {
-    fn from(proto: HostOrSecondaryCommandProto) -> Self {
-        let _ = proto.rsvdp();
-        let _ = proto.capability_type();
+
+impl From<u16> for HostOrSecondaryCommand {
+    fn from(word: u16) -> Self {
+        let Lsb((
+            warm_reset,
+            double_ended,
+            device_number,
+            chain_side,
+            host_hide,
+            (),
+            act_as_slave,
+            host_inbound_end_of_chain_error,
+            drop_on_uninitialized_link,
+            (),
+        )) = P10::<_, 1, 1, 5, 1, 1, 1, 1, 1, 1, 3>(word).into();
         Self {
-            warm_reset: proto.warm_reset(),
-            double_ended: proto.double_ended(),
-            device_number: proto.device_number(),
-            chain_side: proto.chain_side(),
-            host_hide: proto.host_hide(),
-            act_as_slave: proto.act_as_slave(),
-            host_inbound_end_of_chain_error: proto.host_inbound_end_of_chain_error(),
-            drop_on_uninitialized_link: proto.drop_on_uninitialized_link(),
+            warm_reset,
+            double_ended,
+            device_number,
+            chain_side,
+            host_hide,
+            act_as_slave,
+            host_inbound_end_of_chain_error,
+            drop_on_uninitialized_link,
         }
     }
 }
-impl From<u16> for HostOrSecondaryCommand {
-    fn from(word: u16) -> Self { HostOrSecondaryCommandProto::from(word).into() }
-}
-
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Switch {
-}
+pub struct Switch {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReservedHost {
-}
+pub struct ReservedHost {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InterruptDiscoveryAndConfiguration {
-}
+pub struct InterruptDiscoveryAndConfiguration {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UnitIdClumping {
-}
+pub struct UnitIdClumping {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExtendedConfigurationSpaceAccess {
-}
+pub struct ExtendedConfigurationSpaceAccess {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AddressMapping {
-}
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct MsiMappingProto {
-    enabled: bool,
-    fixed: bool,
-    rsvdp: B9,
-    capability_type: B5,
-}
+pub struct AddressMapping {}
 
 /// MSI Mapping Capability
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -989,66 +903,54 @@ pub struct MsiMapping {
     pub base_address_upper: u32,
 }
 impl MsiMapping {
+    pub const SIZE: usize = 2 + 4 + 4;
     pub fn base_address(&self) -> u64 {
         let h = (self.base_address_upper as u64) << 32;
         let l = (self.base_address_lower as u64) & !0xfffff;
         h | l
     }
 }
-impl<'a> TryRead<'a, Endian> for MsiMapping {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let msi_mapping_proto: MsiMappingProto =
-            bytes.read_with::<u16>(offset, endian)?.into();
-        let _ = msi_mapping_proto.rsvdp();
-        let _ = msi_mapping_proto.capability_type();
-        let msim = MsiMapping {
-            enabled: msi_mapping_proto.enabled(),
-            fixed: msi_mapping_proto.fixed(),
-            base_address_lower: bytes.read_with::<u32>(offset, endian)?,
-            base_address_upper: bytes.read_with::<u32>(offset, endian)?,
-        };
-        Ok((msim, *offset))
+impl From<[u8; Self::SIZE]> for MsiMapping {
+    fn from(bytes: [u8; Self::SIZE]) -> Self {
+        let Le((cmd, base_address_lower, base_address_upper)) = P3(bytes).into();
+        let Lsb((enabled, fixed, ())) = P3::<u16, 1, 1, 14>(cmd).into();
+        Self {
+            enabled,
+            fixed,
+            base_address_lower,
+            base_address_upper,
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DirectRoute {
-}
+pub struct DirectRoute {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VCSet {
-}
+pub struct VCSet {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RetryMode {
-}
+pub struct RetryMode {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct X86Encoding {
-}
+pub struct X86Encoding {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Gen3 {
-}
+pub struct Gen3 {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FunctionLevelExtension {
-}
+pub struct FunctionLevelExtension {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerManagement {
-}
+pub struct PowerManagement {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HighNodeCount {
-}
-
+pub struct HighNodeCount {}
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn slave_or_primary_interface() {
@@ -1077,7 +979,8 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, // +14h
             0x00, 0x00, 0x00, 0x00, // +18h
         ];
-        let result = data[2..].read_with::<Hypertransport>(&mut 0, LE).unwrap();
+        let data: [u8; SlaveOrPrimaryInterface::SIZE] = data[2..].try_into().unwrap();
+        let result = data.into();
         let sample = SlaveOrPrimaryInterface {
             command: SlaveOrPrimaryCommand {
                 base_unitid: 0,
@@ -1136,7 +1039,7 @@ mod tests {
                 link_width_out: LinkWidth::Width8bits,
                 doubleword_flow_control_out_enable: false,
             },
-            revision_id: RevisionId { minor: 0, major: 3, },
+            revision_id: RevisionId { minor: 0, major: 3 },
             link_freq_0: 0b1100,
             link_error_0: LinkError {
                 protocol_error: false,
@@ -1221,7 +1124,7 @@ mod tests {
             mem_limit_upper: 0,
             bus_number: 0,
         };
-        assert_eq!(Hypertransport::SlaveOrPrimaryInterface(sample), result);
+        assert_eq!(sample, result);
     }
 
     #[test]
@@ -1242,7 +1145,8 @@ mod tests {
             0xee, 0x02, 0x84, 0x80, // +10h
             0x00, 0x00, 0x01, 0x00, // +14h
         ];
-        let result = data[2..].read_with::<Hypertransport>(&mut 0, LE).unwrap();
+        let data: [u8; HostOrSecondaryInterface::SIZE] = data[2..].try_into().unwrap();
+        let result = data.into();
         let sample = HostOrSecondaryInterface {
             command: HostOrSecondaryCommand {
                 warm_reset: true,
@@ -1279,7 +1183,7 @@ mod tests {
                 link_width_out: LinkWidth::Width16bits,
                 doubleword_flow_control_out_enable: false,
             },
-            revision_id: RevisionId { minor: 0, major: 3, },
+            revision_id: RevisionId { minor: 0, major: 3 },
             link_freq: 0b1100,
             link_error: LinkError {
                 protocol_error: false,
@@ -1341,43 +1245,35 @@ mod tests {
             mem_base_upper: 0,
             mem_limit_upper: 0,
         };
-        assert_eq!(Hypertransport::HostOrSecondaryInterface(sample), result);
+        assert_eq!(sample, result);
     }
 
     #[test]
     fn revision_id() {
-        let data = [
-            0x08, 0x00, 0x25, 0b10001000, // +00h
-        ];
-        let result = data[2..].read_with::<Hypertransport>(&mut 0, LE).unwrap();
-        let sample = RevisionId {
-            major: 1,
-            minor: 5,
-        };
-        assert_eq!(Hypertransport::RevisionId(sample), result);
+        let data = 0b00100101;
+        let result = data.into();
+        let sample = RevisionId { major: 1, minor: 5 };
+        assert_eq!(sample, result);
     }
 
     #[test]
     fn msi_mapping() {
         // MSI Mapping Enable+ Fixed+
         let data = [
-            0x08, 0xb0, 0x03, 0xa8, // +00h
+            0x08, 0x00, 0x03, 0xa8, // +00h
             0x00, 0x00, 0x00, 0x00, // +04h
             0x34, 0x17, 0xda, 0x11, // +08h
         ];
-        let result = data[2..].read_with::<Hypertransport>(&mut 0, LE).unwrap();
+        let data: [u8; MsiMapping::SIZE] = data[2..].try_into().unwrap();
+        let result = data.into();
         let sample = MsiMapping {
             enabled: true,
             fixed: true,
             base_address_lower: 0,
             base_address_upper: 0x11da1734,
         };
-        assert_eq!(Hypertransport::MsiMapping(sample), result);
-        
-        match result {
-            Hypertransport::MsiMapping(msim) =>
-                assert_eq!(0x11da173400000000, msim.base_address()),
-            _ => unreachable!(),
-        }
+        assert_eq!(sample, result);
+
+        assert_eq!(0x11da173400000000, result.base_address());
     }
 }
