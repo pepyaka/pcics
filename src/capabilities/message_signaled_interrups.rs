@@ -84,7 +84,7 @@ impl<'a> TryFrom<&'a [u8]> for MessageSignaledInterrups {
                         let bytes = <[u8; SIZE]>::try_from(slice).ok()?;
                         Some(P3(bytes).into())
                     })
-                    .ok_or(MessageSignaledInterrupsError::MessageControl)?;
+                    .ok_or(MessageSignaledInterrupsError::Size32bit)?;
                 Self {
                     message_control,
                     message_address: MessageAddress::Dword(addr),
@@ -102,7 +102,7 @@ impl<'a> TryFrom<&'a [u8]> for MessageSignaledInterrups {
                         let bytes = <[u8; SIZE]>::try_from(slice).ok()?;
                         Some(P4(bytes).into())
                     })
-                    .ok_or(MessageSignaledInterrupsError::MessageControl)?;
+                    .ok_or(MessageSignaledInterrupsError::Size64bit)?;
                 let _: (u32, u32) = (addr_lo, addr_hi);
                 Self {
                     message_control,
@@ -123,7 +123,7 @@ impl<'a> TryFrom<&'a [u8]> for MessageSignaledInterrups {
                         let bytes = <[u8; SIZE]>::try_from(slice).ok()?;
                         Some(P5(bytes).into())
                     })
-                    .ok_or(MessageSignaledInterrupsError::MessageControl)?;
+                    .ok_or(MessageSignaledInterrupsError::Size32bitPerVector)?;
                 Self {
                     message_control,
                     message_address: MessageAddress::Dword(addr),
@@ -141,7 +141,7 @@ impl<'a> TryFrom<&'a [u8]> for MessageSignaledInterrups {
                         let bytes = <[u8; SIZE]>::try_from(slice).ok()?;
                         Some(P6(bytes).into())
                     })
-                    .ok_or(MessageSignaledInterrupsError::MessageControl)?;
+                    .ok_or(MessageSignaledInterrupsError::Size64bitPerVector)?;
                 let _: (u32, u32) = (addr_lo, addr_hi);
                 Self {
                     message_control,
