@@ -1,13 +1,21 @@
-//! Debug port
+/*!
+Debug port
 
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
-};
+# Examples
 
+Capability value: `Debug port: BAR=1 offset=00a0`
+
+```rust
+# use pcics::capabilities::DebugPort;
+let data = [0x0a, 0x98, 0xa0, 0x20];
+let dp = data[2..].try_into().unwrap();
+assert_eq!(DebugPort { offset: 0x00a0, bar_number: 1 }, dp);
+```
+*/
+
+use heterob::{endianness::LeBytesTryInto, Seq};
+
+use super::CapabilityDataError;
 
 /// Debug port
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,14 +26,18 @@ pub struct DebugPort {
     /// registers
     pub bar_number: u8,
 }
-impl<'a> TryRead<'a, Endian> for DebugPort {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let word = bytes.read_with::<u16>(offset, endian)?;
-        let dp = DebugPort {
-            offset: word & 0x1fff,
-            bar_number: (word >> 13) as u8,
-        };
-        Ok((dp, *offset))
+impl TryFrom<&[u8]> for DebugPort {
+    type Error = CapabilityDataError;
+
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
+        let Seq { head, .. }: Seq<u16, _> =
+            slice.le_bytes_try_into().map_err(|_| CapabilityDataError {
+                name: "Debug port",
+                size: 2,
+            })?;
+        Ok(DebugPort {
+            offset: head & 0x1fff,
+            bar_number: (head >> 13) as u8,
+        })
     }
 }

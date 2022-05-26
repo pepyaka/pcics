@@ -346,13 +346,18 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
             .try_into()
             .map(Kind::VendorSpecific)
             .context(VendorSpecificSnafu { ptr })?,
-        0x0a => cap_data.read_with(&mut 0, LE).map(Kind::DebugPort)?,
+        0x0a => cap_data
+            .try_into()
+            .map(Kind::DebugPort)
+            .context(DataSnafu { ptr })?,
+        // 0x0a => cap_data.read_with(&mut 0, LE).map(Kind::DebugPort)?,
         0x0b => Kind::CompactPciResourceControl(CompactPciResourceControl),
         0x0c => Kind::PciHotPlug(PciHotPlug),
         0x0d => cap_data
             .try_into()
             .map(Kind::BridgeSubsystemVendorId)
             .context(DataSnafu { ptr })?,
+        0x0e => Kind::Agp8x(Agp8x),
         0x0f => Kind::SecureDevice(SecureDevice),
         0x10 => cap_data
             .try_into()

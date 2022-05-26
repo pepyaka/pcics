@@ -68,11 +68,11 @@ pub enum Virtio {
     Unknown { bar: u8, offset: u32, size: u32 },
 }
 impl Virtio {
-    /// Identifies the structure: [u8]
-    /// [u8]: Where to find it: [u8]
-    /// [[u8;3]]: Pad to full dword: [[u8;3]]
-    /// Offset within bar: [u32]
-    /// Length of the structure, in bytes: [u32]
+    /// Identifies the structure: `[u8]`
+    /// `[u8]`: Where to find it: `[u8]`
+    /// `[[u8;3]]`: Pad to full dword: `[[u8;3]]`
+    /// Offset within bar: `[u32]`
+    /// Length of the structure, in bytes: `[u32]`
     pub const SIZE: usize = 1 + 1 + 3 + 4 + 4; // 13 bytes
 }
 impl<'a> TryFrom<&'a [u8]> for Virtio {
