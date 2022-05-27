@@ -371,7 +371,10 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
             .try_into()
             .map(Kind::Sata)
             .context(DataSnafu { ptr })?,
-        0x13 => cap_data.read_with(&mut 0, LE).map(Kind::AdvancedFeatures)?,
+        0x13 => cap_data
+            .try_into()
+            .map(Kind::AdvancedFeatures)
+            .context(DataSnafu { ptr })?,
         v => Kind::Reserved(v),
     };
     Ok(Capability { pointer: ptr, kind })
