@@ -215,7 +215,8 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
                         .context(DataSnafu { offset })?,
             0x0011 => Kind::MultiRootIoVirtualization,
             0x0012 => Kind::Multicast,
-            0x0013 => Kind::PageRequestInterface(bytes.read_with(ecap_data_offset, LE)?),
+            0x0013 => ecap_data.try_into().map(Kind::PageRequestInterface)
+                        .context(DataSnafu { offset })?,
             0x0014 => Kind::AmdReserved,
             0x0015 => Kind::ResizableBar,
             0x0016 => Kind::DynamicPowerAllocation,

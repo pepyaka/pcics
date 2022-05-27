@@ -7,8 +7,6 @@ use super::CapabilityDataError;
 /// PCI Bridge Subsystem Vendor ID
 /// ```
 /// # use pcics::capabilities::BridgeSubsystemVendorId;
-/// # use pretty_assertions::assert_eq;
-/// # use byte::{ ctx::*, self, TryRead, BytesExt, };
 /// let data = [0x00,0x00,0x11,0x22,0x33,0x44];
 ///
 /// let result: BridgeSubsystemVendorId = data.try_into().unwrap();
