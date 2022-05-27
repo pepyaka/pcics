@@ -100,7 +100,7 @@ let sample = vec![
             capabilities: pmi::Capabilities {
                 version: 0b11,
                 pme_clock: false,
-                reserved: false,
+                immediate_readiness_on_return_to_d0: false,
                 device_specific_initialization: false,
                 aux_current: pmi::AuxCurrent::SelfPowered,
                 d1_support: false,
@@ -115,7 +115,6 @@ let sample = vec![
             },
             control: pmi::Control {
                 power_state: pmi::PowerState::D0,
-                reserved: 0b000010,
                 no_soft_reset: true,
                 pme_enabled: false,
                 data_select: pmi::DataSelect::PowerConsumedD0,
@@ -144,12 +143,6 @@ assert_eq!(sample, result);
 ```
 */
 
-use byte::{
-    ctx::LE,
-    // TryRead,
-    // TryWrite,
-    BytesExt,
-};
 use snafu::prelude::*;
 
 use super::DDR_OFFSET;
@@ -327,8 +320,9 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
     let kind = match id {
         0x00 => Kind::NullCapability,
         0x01 => cap_data
-            .read_with(&mut 0, LE)
-            .map(Kind::PowerManagementInterface)?,
+            .try_into()
+            .map(Kind::PowerManagementInterface)
+            .context(DataSnafu { ptr })?,
         0x03 => cap_data
             .try_into()
             .map(Kind::VitalProductData)
@@ -454,7 +448,7 @@ mod tests {
             Ok(Capability {
                 pointer: 0x50,
                 kind: CapabilityKind::PowerManagementInterface(
-                    data.read_with(&mut (0x50 + 2), LE).unwrap(),
+                    data[0x50 + 2 .. ].try_into().unwrap(),
                 ),
             }),
             Ok(Capability {
