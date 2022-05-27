@@ -329,7 +329,10 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
         0x01 => cap_data
             .read_with(&mut 0, LE)
             .map(Kind::PowerManagementInterface)?,
-        0x03 => cap_data.read_with(&mut 0, LE).map(Kind::VitalProductData)?,
+        0x03 => cap_data
+            .try_into()
+            .map(Kind::VitalProductData)
+            .context(DataSnafu { ptr })?,
         0x04 => cap_data
             .try_into()
             .map(Kind::SlotIdentification)
