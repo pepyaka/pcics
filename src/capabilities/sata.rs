@@ -1,14 +1,34 @@
-//! Serial ATA Data/Index Configuration
+/*!
+# Serial ATA Data/Index Configuration
 
-use modular_bitfield::prelude::*;
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
+Cpability used for the Index-Data Pair mechanism.
+
+## Struct diagram
+[Sata]
+- [Revision]
+- [BarOffset]
+- [BarLocation]
+
+## Examples
+
+> SATA HBA v1.0 BAR4 Offset=00000004
+
+```rust
+# use pcics::capabilities::sata::*;
+let data = [0x12, 0x00, 0x10, 0x00, 0x48, 0x00, 0x00, 0x00,];
+let result = data[2..].try_into().unwrap();
+let sample = Sata {
+    revision: Revision { minor: 0, major: 1 },
+    bar_offset: BarOffset(0x04),
+    bar_location: BarLocation::Bar4,
 };
+assert_eq!(sample, result);
+```
+*/
 
+use heterob::{bit_numbering::Lsb, endianness::Le, Seq, P2, P3};
+
+use super::CapabilityDataError;
 
 /// Slave/Primary Interface
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,28 +39,26 @@ pub struct Sata {
     /// BAR Location
     pub bar_location: BarLocation,
 }
-impl<'a> TryRead<'a, Endian> for Sata {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let revision = bytes.read_with::<u8>(offset, endian)?.into();
-        let _reserved = bytes.read_with::<u8>(offset, endian)?;
-        let sata_cap1_proto: SataCapability1Proto =
-            bytes.read_with::<u32>(offset, endian)?.into();
-        let _ = sata_cap1_proto.rsvdp();
-        let sata = Sata {
-            revision,
-            bar_location: sata_cap1_proto.bar_location().into(),
-            bar_offset: BarOffset(sata_cap1_proto.bar_offset()),
-        };
-        Ok((sata, *offset))
-    }
-}
+impl TryFrom<&[u8]> for Sata {
+    type Error = CapabilityDataError;
 
-#[bitfield(bits = 8)]
-#[repr(u8)]
-pub struct RevisionProto {
-    minor: B4,
-    major: B4,
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
+        let Seq {
+            head: Le((revision, rsvd, sata_cap1)),
+            ..
+        } = P3(slice).try_into().map_err(|_| CapabilityDataError {
+            name: "Serial ATA",
+            size: 6,
+        })?;
+        let _: u8 = rsvd;
+        let Lsb((minor, major)) = P2::<u8, 4, 4>(revision).into();
+        let Lsb((bar_location, bar_offset, ())) = P3::<u32, 4, 20, 8>(sata_cap1).into();
+        Ok(Self {
+            revision: Revision { minor, major },
+            bar_offset: BarOffset(bar_offset),
+            bar_location: From::<u8>::from(bar_location),
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,26 +68,6 @@ pub struct Revision {
     /// Major Revision
     pub major: u8,
 }
-impl From<RevisionProto> for Revision {
-    fn from(proto: RevisionProto) -> Self {
-        Self {
-            minor: proto.minor(),
-            major: proto.major(),
-        }
-    }
-}
-impl From<u8> for Revision {
-    fn from(byte: u8) -> Self { RevisionProto::from(byte).into() }
-}
-
-#[bitfield(bits = 32)]
-#[repr(u32)]
-pub struct SataCapability1Proto {
-    bar_location: B4,
-    bar_offset: B20,
-    rsvdp: B8,
-}
-
 
 /// Indicates the absolute PCI Configuration Register address of the BAR containing the Index-Data
 /// Pair in Dword granularity
@@ -107,7 +105,6 @@ impl From<u8> for BarLocation {
         }
     }
 }
-
 
 ///  Indicates the offset into the BAR where the Index-Data Pair are located in Dword granularity
 ///
