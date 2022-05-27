@@ -1,16 +1,34 @@
-//! Slot Identification
-//!
-//! This Capability structure identifies a bridge that provides external expansion capabilities
+/*!
+# Slot Identification
 
-use modular_bitfield::prelude::*;
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
+This Capability structure identifies a bridge that provides external expansion capabilities
+
+## Struct diagram
+[SlotIdentification]
+- [ExpansionSlot]
+
+## Examples
+
+> Slot ID: 2 slots, First+, chassis 0x02
+
+```rust
+# use pcics::capabilities::slot_identification::*;
+let data = [0x04, 0x00, 0x22, 0x02];
+let result = data[2..].try_into().unwrap();
+let sample = SlotIdentification {
+    expansion_slot: ExpansionSlot {
+        expansion_slots_provided: 2,
+        first_in_chassis: true,
+    },
+    chassis_number: 2,
 };
+assert_eq!(sample, result);
+```
+*/
 
+use heterob::{bit_numbering::Lsb, endianness::Le, Seq, P2, P3};
+
+use super::CapabilityDataError;
 
 /// Slot Identification
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,23 +37,28 @@ pub struct SlotIdentification {
     /// Contains the physical chassis number for the slots on this bridge’s secondary interface
     pub chassis_number: u8,
 }
-impl<'a> TryRead<'a, Endian> for SlotIdentification {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let si = SlotIdentification {
-            expansion_slot: bytes.read_with::<u8>(offset, endian)?.into(),
-            chassis_number: bytes.read_with::<u8>(offset, endian)?,
-        };
-        Ok((si, *offset))
-    }
-}
+impl<'a> TryFrom<&'a [u8]> for SlotIdentification {
+    type Error = CapabilityDataError;
 
-#[bitfield(bits = 8)]
-#[repr(u8)]
-pub struct ExpansionSlotProto {
-    expansion_slots_provided: B5,
-    first_in_chassis: bool,
-    rsvdp: B2,
+    fn try_from(slice: &'a [u8]) -> Result<Self, Self::Error> {
+        let Seq {
+            head: Le((expansion_slot, chassis_number)),
+            ..
+        } = P2(slice).try_into().map_err(|_| CapabilityDataError {
+            name: "Slot Identification",
+            size: 2,
+        })?;
+        let Lsb((expansion_slots_provided, first_in_chassis, ())) =
+            P3::<u8, 5, 1, 2>(expansion_slot).into();
+        let expansion_slot = ExpansionSlot {
+            expansion_slots_provided,
+            first_in_chassis,
+        };
+        Ok(Self {
+            expansion_slot,
+            chassis_number,
+        })
+    }
 }
 
 /// Provides information used by system software in calculating the slot number of a device plugged
@@ -46,16 +69,4 @@ pub struct ExpansionSlot {
     pub expansion_slots_provided: u8,
     /// Indicates that this bridge is the first in an expansion chassis
     pub first_in_chassis: bool,
-}
-impl From<ExpansionSlotProto> for ExpansionSlot {
-    fn from(proto: ExpansionSlotProto) -> Self {
-        let _ = proto.rsvdp();
-        Self {
-            expansion_slots_provided: proto.expansion_slots_provided(),
-            first_in_chassis: proto.first_in_chassis(),
-        }
-    }
-}
-impl From<u8> for ExpansionSlot {
-    fn from(byte: u8) -> Self { ExpansionSlotProto::from(byte).into() }
 }

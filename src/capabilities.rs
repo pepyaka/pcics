@@ -331,8 +331,9 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
             .map(Kind::PowerManagementInterface)?,
         0x03 => cap_data.read_with(&mut 0, LE).map(Kind::VitalProductData)?,
         0x04 => cap_data
-            .read_with(&mut 0, LE)
-            .map(Kind::SlotIdentification)?,
+            .try_into()
+            .map(Kind::SlotIdentification)
+            .context(DataSnafu { ptr })?,
         0x05 => cap_data
             .try_into()
             .map(Kind::MessageSignaledInterrups)
@@ -350,7 +351,6 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
             .try_into()
             .map(Kind::DebugPort)
             .context(DataSnafu { ptr })?,
-        // 0x0a => cap_data.read_with(&mut 0, LE).map(Kind::DebugPort)?,
         0x0b => Kind::CompactPciResourceControl(CompactPciResourceControl),
         0x0c => Kind::PciHotPlug(PciHotPlug),
         0x0d => cap_data
