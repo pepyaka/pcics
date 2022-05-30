@@ -197,7 +197,8 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
             0x0000 => Kind::Null,
             0x0001 => Kind::AdvancedErrorReporting(bytes.read_with(ecap_data_offset, LE)?),
             0x0002 => Kind::VirtualChannel(bytes.read_with(ecap_data_offset, LE)?),
-            0x0003 => Kind::DeviceSerialNumber(bytes.read_with(ecap_data_offset, LE)?),
+            0x0003 => ecap_data.try_into().map(Kind::DeviceSerialNumber)
+                        .context(DataSnafu { offset })?,
             0x0004 => ecap_data.try_into().map(Kind::PowerBudgeting)
                         .context(DataSnafu { offset })?,
             0x0005 => ecap_data.try_into().map(Kind::RootComplexLinkDeclaration)
