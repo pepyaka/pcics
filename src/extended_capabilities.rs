@@ -229,7 +229,8 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
             0x001B => Kind::ProcessAddressSpaceId(bytes.read_with(ecap_data_offset, LE)?),
             0x001C => Kind::LnRequester,
             0x001D => Kind::DownstreamPortContainment(bytes.read_with(ecap_data_offset, LE)?),
-            0x001E => Kind::L1PmSubstates(bytes.read_with(ecap_data_offset, LE)?),
+            0x001E => ecap_data.try_into().map(Kind::L1PmSubstates)
+                        .context(DataSnafu { offset })?,
             0x001F => Kind::PrecisionTimeMeasurement(bytes.read_with(ecap_data_offset, LE)?),
             0x0020 => Kind::PciExpressOverMphy,
             0x0021 => Kind::FrsQueueing,
