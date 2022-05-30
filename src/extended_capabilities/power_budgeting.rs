@@ -1,84 +1,106 @@
-//! Power Budgeting
-//!
-//! The PCI Express Power Budgeting Capability allows the system to allocate power to devices that
-//! are added to the system at runtime.
+/*!
+# Power Budgeting
 
-use modular_bitfield::prelude::*;
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
+The PCI Express Power Budgeting Capability allows the system to allocate power to devices that
+are added to the system at runtime.
+
+## Struct diagram
+[PowerBudgeting]
+- [Data]
+  - [BasePower]
+  - [DataScale]
+  - [PmSubState]
+  - [PmState]
+  - [OperationConditionType]
+  - [PowerRail]
+- [PowerBudgetCapability]
+
+## Examples
+
+```rust
+# use pcics::extended_capabilities::power_budgeting::*;
+let data = [
+    0x04, 0x00, 0x01, 0x16, 0x00, 0x00, 0x00, 0x00,
+    0x1b, 0x81, 0x07, 0x00, 0x01, 0x00, 0x00, 0x00,
+];
+let result = data[4..].try_into().unwrap();
+let sample = PowerBudgeting {
+    data_select: 0x00,
+    data: Data {
+        base_power: BasePower::Value(0x1b),
+        data_scale: DataScale::Deci,
+        pm_sub_state: PmSubState::Default,
+        pm_state: PmState::D0,
+        operation_condition_type: OperationConditionType::Maximum,
+        power_rail: PowerRail::Power3_3v,
+    },
+    power_budget_capability: PowerBudgetCapability {
+        system_allocated: true,
+    },
 };
+assert_eq!(sample, result);
+```
+*/
 
+use heterob::{bit_numbering::Lsb, endianness::Le, Seq, P2, P5, P7};
+
+use super::ExtendedCapabilityDataError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PowerBudgeting {
     /// Data Select
     pub data_select: u8,
-    /// Data
     pub data: Data,
-    /// Power Budget Capability
     pub power_budget_capability: PowerBudgetCapability,
 }
-impl<'a> TryRead<'a, Endian> for PowerBudgeting {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let pb = PowerBudgeting {
-            data_select: bytes.read_with::<u8>(offset, endian)?,
-            data: {
-                let _rsvdp = bytes.read_with::<&[u8]>(offset, Bytes::Len(3))?;
-                bytes.read_with::<u32>(offset, endian)?.into()
+impl TryFrom<&[u8]> for PowerBudgeting {
+    type Error = ExtendedCapabilityDataError;
+
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
+        let Seq {
+            head: Le((data_select, rsvdp_0, data, power_budget_capability, rsvdp_1)),
+            ..
+        } = P5(slice)
+            .try_into()
+            .map_err(|_| ExtendedCapabilityDataError {
+                name: "Power Budgeting",
+                size: 12,
+            })?;
+        let _: ([u8; 3], [u8; 3]) = (rsvdp_0, rsvdp_1);
+        let Lsb((
+            base_power,
+            data_scale,
+            pm_sub_state,
+            pm_state,
+            operation_condition_type,
+            power_rail,
+            (),
+        )) = P7::<u32, 8, 2, 3, 2, 3, 3, 11>(data).into();
+        let Lsb((system_allocated, ())) = P2::<u8, 1, 7>(power_budget_capability).into();
+        Ok(Self {
+            data_select,
+            data: Data {
+                base_power: From::<u8>::from(base_power),
+                data_scale: From::<u8>::from(data_scale),
+                pm_sub_state: From::<u8>::from(pm_sub_state),
+                pm_state: From::<u8>::from(pm_state),
+                operation_condition_type: From::<u8>::from(operation_condition_type),
+                power_rail: From::<u8>::from(power_rail),
             },
-            power_budget_capability: bytes.read_with::<u8>(offset, endian)?.into(),
-        };
-        Ok((pb, *offset))
+            power_budget_capability: PowerBudgetCapability { system_allocated },
+        })
     }
 }
 
-#[bitfield(bits = 32)]
-#[repr(u32)]
-pub struct DataProto {
-    base_power: B8,
-    data_scale: B2,
-    pm_sub_state: B3,
-    pm_state: B2,
-    operation_condition_type: B3,
-    power_rail: B3,
-    rsvdp: B11,
-}
-
+/// Power Budgeting Data
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Data {
-    /// Base Power
     pub base_power: BasePower,
-    /// Data Scale
     pub data_scale: DataScale,
-    /// PM Sub State
     pub pm_sub_state: PmSubState,
-    /// PM State
     pub pm_state: PmState,
-    /// Type
     pub operation_condition_type: OperationConditionType,
-    /// Power Rail
     pub power_rail: PowerRail,
-}
-impl From<DataProto> for Data {
-    fn from(proto: DataProto) -> Self {
-        let _ = proto.rsvdp();
-        Self {
-            base_power: proto.base_power().into(),
-            data_scale: proto.data_scale().into(),
-            pm_sub_state: proto.pm_sub_state().into(),
-            pm_state: proto.pm_state().into(),
-            operation_condition_type: proto.operation_condition_type().into(),
-            power_rail: proto.power_rail().into(),
-        }
-    }
-}
-impl From<u32> for Data {
-    fn from(dword: u32) -> Self { DataProto::from(dword).into() }
 }
 
 /// Specifies in watts the base power value in the given operating condition
@@ -203,11 +225,12 @@ impl From<u8> for OperationConditionType {
             0b100 => Self::SustainedEmergencyPowerReductionState,
             0b101 => Self::MaximumEmergencyPowerReductionState,
             0b111 => Self::Maximum,
-                v => Self::Reserved(v),
+            v => Self::Reserved(v),
         }
     }
 }
 
+/// Specifies the thermal load or power rail of the operating condition being described
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PowerRail {
     /// Power (12V)
@@ -218,6 +241,8 @@ pub enum PowerRail {
     Power1_5vOr1_8v,
     /// Thermal
     Thermal,
+    /// Reserved
+    Reserved(u8),
 }
 impl From<u8> for PowerRail {
     fn from(byte: u8) -> Self {
@@ -226,32 +251,14 @@ impl From<u8> for PowerRail {
             0b01 => Self::Power3_3v,
             0b10 => Self::Power1_5vOr1_8v,
             0b11 => Self::Thermal,
-            _ => unreachable!(),
+            v => Self::Reserved(v),
         }
     }
 }
 
-
-#[bitfield(bits = 8)]
-#[repr(u8)]
-pub struct PowerBudgetCapabilityProto {
-    system_allocated: bool,
-    rsvdp: B7,
-}
-
+/// Power Budget Capability
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PowerBudgetCapability {
     /// System Allocated
     pub system_allocated: bool,
-}
-impl From<PowerBudgetCapabilityProto> for PowerBudgetCapability {
-    fn from(proto: PowerBudgetCapabilityProto) -> Self {
-        let _ = proto.rsvdp();
-        Self {
-            system_allocated: proto.system_allocated(),
-        }
-    }
-}
-impl From<u8> for PowerBudgetCapability {
-    fn from(byte: u8) -> Self { PowerBudgetCapabilityProto::from(byte).into() }
 }
