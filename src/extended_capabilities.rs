@@ -229,7 +229,8 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
             0x0015 => Kind::ResizableBar,
             0x0016 => Kind::DynamicPowerAllocation,
             0x0017 => Kind::TphRequester(bytes.read_with(ecap_data_offset, LE)?),
-            0x0018 => Kind::LatencyToleranceReporting(bytes.read_with(ecap_data_offset, LE)?),
+            0x0018 => ecap_data.try_into().map(Kind::LatencyToleranceReporting)
+                        .context(DataSnafu { offset })?,
             0x0019 => Kind::SecondaryPciExpress(bytes.read_with(ecap_data_offset, LE)?),
             0x001A => Kind::ProtocolMultiplexing,
             0x001B => Kind::ProcessAddressSpaceId(bytes.read_with(ecap_data_offset, LE)?),
