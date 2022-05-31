@@ -125,6 +125,11 @@ pub enum ExtendedCapabilityError {
         offset: u16,
         source: single_root_io_virtualization::SingleRootIoVirtualizationError,
     },
+    #[snafu(display("[{offset:03x}] Advanced Error Reporting error: {source}"))]
+    AdvancedErrorReporting {
+        offset: u16,
+        source: advanced_error_reporting::AdvancedErrorReportingError,
+    },
 }
 impl From<byte::Error> for ExtendedCapabilityError {
     fn from(be: byte::Error) -> Self {
@@ -195,7 +200,8 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
         use ExtendedCapabilityKind as Kind;
         let kind = match id {
             0x0000 => Kind::Null,
-            0x0001 => Kind::AdvancedErrorReporting(bytes.read_with(ecap_data_offset, LE)?),
+            0x0001 => ecap_data.try_into().map(Kind::AdvancedErrorReporting)
+                        .context(AdvancedErrorReportingSnafu { offset })?,
             0x0002 => Kind::VirtualChannel(bytes.read_with(ecap_data_offset, LE)?),
             0x0003 => ecap_data.try_into().map(Kind::DeviceSerialNumber)
                         .context(DataSnafu { offset })?,
