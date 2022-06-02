@@ -202,7 +202,8 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
             0x0000 => Kind::Null,
             0x0001 => ecap_data.try_into().map(Kind::AdvancedErrorReporting)
                         .context(AdvancedErrorReportingSnafu { offset })?,
-            0x0002 => Kind::VirtualChannel(bytes.read_with(ecap_data_offset, LE)?),
+            0x0002 => ecap_data.try_into().map(Kind::VirtualChannel)
+                        .context(DataSnafu { offset })?,
             0x0003 => ecap_data.try_into().map(Kind::DeviceSerialNumber)
                         .context(DataSnafu { offset })?,
             0x0004 => ecap_data.try_into().map(Kind::PowerBudgeting)
@@ -212,7 +213,8 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
             0x0006 => Kind::RootComplexInternalLinkControl,
             0x0007 => Kind::RootComplexEventCollectorEndpointAssociation,
             0x0008 => Kind::MultiFunctionVirtualChannel,
-            0x0009 => Kind::VirtualChannelMfvcPresent(bytes.read_with(ecap_data_offset, LE)?),
+            0x0009 => ecap_data.try_into().map(Kind::VirtualChannelMfvcPresent)
+                        .context(DataSnafu { offset })?,
             0x000A => Kind::RootComplexRegisterBlock,
             0x000B => Kind::VendorSpecificExtendedCapability(bytes.read_with(ecap_data_offset, LE)?),
             0x000C => Kind::ConfigurationAccessCorrelation,

@@ -1,26 +1,86 @@
-//! Virtual Channel Capability
-//!
-//! The Virtual Channel (VC) Capability is an optional Extended Capability required for devices
-//! that have Ports (or for individual Functions) that support functionality beyond the default
-//! Traffic Class (TC0) over the default Virtual Channel (VC0).
+/*!
+# Virtual Channel Capability
+
+The Virtual Channel (VC) Capability is an optional Extended Capability required for devices
+that have Ports (or for individual Functions) that support functionality beyond the default
+Traffic Class (TC0) over the default Virtual Channel (VC0).
+
+## Struct diagram
+[VirtualChannel]
+- [PortVcCapability1]
+  - [ReferenceClock]
+  - [PortArbitrationTableEntrySize]
+- [PortVcCapability2]
+  - [VcArbitrationCapability]
+- [PortVcControl]
+  - [VcArbitrationSelect]
+- [PortVcStatus]
+
+## Examples
+> ```text
+> Caps:   LPEVC=0 RefClk=100ns PATEntryBits=1
+> Arb:    Fixed- WRR32- WRR64- WRR128-
+> Ctrl:   ArbSelect=Fixed
+> Status: InProgress-
+> VC0:    Caps:   PATOffset=00 MaxTimeSlots=1 RejSnoopTrans-
+>         Arb:    Fixed- WRR32- WRR64- WRR128- TWRR128- WRR256-
+>         Ctrl:   Enable+ ID=0 ArbSelect=Fixed TC/VC=ff
+>         Status: NegoPending- InProgress-
+> ```
+
+```rust
+# use pcics::extended_capabilities::virtual_channel::*;
+let data = [
+    0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x80,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+];
+
+let result: VirtualChannel = data[4..].try_into().unwrap();
+
+let mut sample = result.clone();
+sample.port_vc_capability_1 = PortVcCapability1 {
+    extended_vc_count: 0,
+    low_priority_extended_vc_count: 0,
+    reference_clock: ReferenceClock::Rc100ns,
+    port_arbitration_table_entry_size: 0.into(),
+};
+sample.port_vc_capability_2 = PortVcCapability2 {
+    vc_arbitration_capability: VcArbitrationCapability {
+        hardware_fixed_arbitration: false,
+        wrr_32_phases: false,
+        wrr_64_phases: false,
+        wrr_128_phases: false,
+        reserved: 0x0,
+    },
+    vc_arbitration_table_offset: 0,
+};
+sample.port_vc_control = PortVcControl {
+    load_vc_arbitration_table: false,
+    vc_arbitration_select: VcArbitrationSelect::HardwareFixedArbitration,
+};
+sample.port_vc_status = PortVcStatus {
+    vc_arbitration_table_status: false,
+};
+
+assert_eq!(sample, result);
+```
+*/
+
+use heterob::{bit_numbering::Lsb, endianness::Le, Seq, P2, P3, P4, P7, P8, P13};
+use snafu::Snafu;
+
+use super::ExtendedCapabilityDataError;
 
 use core::slice;
 
-use modular_bitfield::prelude::*;
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
-};
-
 use super::ECH_BYTES;
-
 
 /// Numeral unit for VC Arbitration Table Offset and Port Arbitration Table Offset
 const DQWORD: usize = 16;
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VirtualChannel<'a> {
@@ -29,7 +89,7 @@ pub struct VirtualChannel<'a> {
     pub port_vc_capability_1: PortVcCapability1,
     /// Port VC Capability Register 2
     pub port_vc_capability_2: PortVcCapability2,
-    /// Port VC Control Register
+    /// Por VC Control Register
     pub port_vc_control: PortVcControl,
     /// Port VC Status Register
     pub port_vc_status: PortVcStatus,
@@ -43,7 +103,9 @@ impl<'a> VirtualChannel<'a> {
     }
     pub fn vc_arbitration_table(&self) -> VcArbitrationTable<'a> {
         let offset = self.port_vc_capability_2.vc_arbitration_table_offset;
-        let entries_number = self.port_vc_control.vc_arbitration_select
+        let entries_number = self
+            .port_vc_control
+            .vc_arbitration_select
             .vc_arbitration_table_length();
         let start = offset as usize * DQWORD - ECH_BYTES;
         // VC Arbitration Table entry length is 4 bits, so there are 2 entries in one byte
@@ -51,10 +113,18 @@ impl<'a> VirtualChannel<'a> {
         let data = &self.data[start..end];
         VcArbitrationTable::new(data)
     }
-    pub fn port_arbitration_table(&'a self, evc: &'a ExtendedVirtualChannel) -> PortArbitrationTable<'a> {
+    pub fn port_arbitration_table(
+        &'a self,
+        evc: &'a ExtendedVirtualChannel,
+    ) -> PortArbitrationTable<'a> {
         let offset = evc.vc_resource_capability.port_arbitration_table_offset;
-        let entry_size_bits = self.port_vc_capability_1.port_arbitration_table_entry_size.bits();
-        let entries_number = evc.vc_resource_control.port_arbitration_select
+        let entry_size_bits = self
+            .port_vc_capability_1
+            .port_arbitration_table_entry_size
+            .bits();
+        let entries_number = evc
+            .vc_resource_control
+            .port_arbitration_select
             .port_arbitration_table_length();
         let start = offset as usize * DQWORD - ECH_BYTES;
         let end = start + entry_size_bits * entries_number / 8;
@@ -62,33 +132,29 @@ impl<'a> VirtualChannel<'a> {
         PortArbitrationTable::new(data, entry_size_bits)
     }
 }
-impl<'a> TryRead<'a, Endian> for VirtualChannel<'a> {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let vc = VirtualChannel {
-            data: bytes,
-            port_vc_capability_1: bytes.read_with::<u32>(offset, endian)?.into(),
-            port_vc_capability_2: bytes.read_with::<u32>(offset, endian)?.into(),
-            port_vc_control: bytes.read_with::<u16>(offset, endian)?.into(),
-            port_vc_status: bytes.read_with::<u16>(offset, endian)?.into(),
-        };
-        Ok((vc, *offset))
+impl<'a> TryFrom<&'a [u8]> for VirtualChannel<'a> {
+    type Error = ExtendedCapabilityDataError;
+
+    fn try_from(slice: &'a [u8]) -> Result<Self, Self::Error> {
+        let Seq {
+            head: Le((port_vc_capability_1, port_vc_capability_2, port_vc_control, port_vc_status)),
+            ..
+        } = P4(slice)
+            .try_into()
+            .map_err(|_| ExtendedCapabilityDataError {
+                name: "Virtual Channel",
+                size: 8,
+            })?;
+        Ok(Self {
+            data: slice,
+            port_vc_capability_1: From::<u32>::from(port_vc_capability_1),
+            port_vc_capability_2: From::<u32>::from(port_vc_capability_2),
+            port_vc_control: From::<u16>::from(port_vc_control),
+            port_vc_status: From::<u16>::from(port_vc_status),
+        })
     }
 }
 
-
-
-#[bitfield(bits = 32)]
-#[repr(u32)]
-pub struct PortVcCapability1Proto {
-    extended_vc_count: B3,
-    rsvdp: B1,
-    low_priority_extended_vc_count: B3,
-    rsvdp_2: B1,
-    reference_clock: B2,
-    port_arbitration_table_entry_size: B2,
-    rsvdp_3: B20,
-}
 /// The Port VC Capability register 1 describes the configuration of the Virtual Channels
 /// associated with a PCI Express Port.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,21 +171,25 @@ pub struct PortVcCapability1 {
     /// Indicates the size (in bits) of Port Arbitration table entry in the Function.
     pub port_arbitration_table_entry_size: PortArbitrationTableEntrySize,
 }
-impl From<PortVcCapability1Proto> for PortVcCapability1 {
-    fn from(proto: PortVcCapability1Proto) -> Self {
-        let _ = proto.rsvdp();
-        let _ = proto.rsvdp_2();
-        let _ = proto.rsvdp_3();
+
+impl From<u32> for PortVcCapability1 {
+    fn from(dword: u32) -> Self {
+        let Lsb((
+            extended_vc_count,
+            (),
+            low_priority_extended_vc_count,
+            (),
+            reference_clock,
+            port_arbitration_table_entry_size,
+            (),
+        )) = P7::<_, 3, 1, 3, 1, 2, 2, 20>(dword).into();
         Self {
-            extended_vc_count: proto.extended_vc_count(),
-            low_priority_extended_vc_count: proto.low_priority_extended_vc_count(),
-            reference_clock: proto.reference_clock().into(),
-            port_arbitration_table_entry_size: proto.port_arbitration_table_entry_size().into(),
+            extended_vc_count,
+            low_priority_extended_vc_count,
+            reference_clock: From::<u8>::from(reference_clock),
+            port_arbitration_table_entry_size: From::<u8>::from(port_arbitration_table_entry_size),
         }
     }
-}
-impl From<u32> for PortVcCapability1 {
-    fn from(dword: u32) -> Self { PortVcCapability1Proto::from(dword).into() }
 }
 
 /// Indicates the reference clock for Virtual Channels that support time-based WRR Port
@@ -135,7 +205,7 @@ impl From<u8> for ReferenceClock {
     fn from(byte: u8) -> Self {
         match byte {
             0b000 => Self::Rc100ns,
-                v => Self::Reserved(v),
+            v => Self::Reserved(v),
         }
     }
 }
@@ -143,13 +213,17 @@ impl From<u8> for ReferenceClock {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PortArbitrationTableEntrySize(u8);
 impl PortArbitrationTableEntrySize {
-    pub fn bits(&self) -> usize { 1 << self.0 }
+    pub fn bits(&self) -> usize {
+        1 << self.0
+    }
 }
 impl From<u8> for PortArbitrationTableEntrySize {
-    fn from(byte: u8) -> Self { Self(byte) }
+    fn from(byte: u8) -> Self {
+        Self(byte)
+    }
 }
 
-/// An iterator through 0 - 7 (Extended Virtual Channels)[ExtendedVirtualChannel]
+/// An iterator through 0 - 7 [Extended Virtual Channels](ExtendedVirtualChannel)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExtendedVirtualChannels<'a> {
     data: &'a [u8],
@@ -165,23 +239,39 @@ impl<'a> ExtendedVirtualChannels<'a> {
             // > Capability and associated registers.
             // Does it mean there is always one iteration?
             count: count + 1,
-            offset: 0
+            offset: 0,
         }
     }
 }
 impl<'a> Iterator for ExtendedVirtualChannels<'a> {
-    type Item = ExtendedVirtualChannel;
+    type Item = Result<ExtendedVirtualChannel, ExtendedVirtualChannelError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.count == 0 {
             None
         } else {
-            let evc: ExtendedVirtualChannel =
-                self.data.read_with(&mut self.offset, LE).ok()?;
+            let slice = self
+                .data
+                .get(self.offset..self.offset + ExtendedVirtualChannel::SIZE)?;
+            let result = slice
+                .try_into()
+                .map(|Seq { head, .. }| From::<[u8; ExtendedVirtualChannel::SIZE]>::from(head))
+                .map_err(|_| ExtendedVirtualChannelError {
+                    number: self.count,
+                    offset: self.offset,
+                });
             self.count -= 1;
-            Some(evc)
+            self.offset += ExtendedVirtualChannel::SIZE;
+            Some(result)
         }
     }
+}
+
+/// Extended Virtual Channel Error
+#[derive(Snafu, Debug, Clone, PartialEq, Eq)]
+pub struct ExtendedVirtualChannelError {
+    number: u8,
+    offset: usize,
 }
 
 /// Virtual Channel resources
@@ -195,61 +285,19 @@ pub struct ExtendedVirtualChannel {
     pub vc_resource_status: VcResourceStatus,
 }
 impl ExtendedVirtualChannel {
-    pub fn is_unreadable(&self) -> bool {
-        let caps: u32 = VcResourceCapabilityProto::from(self.vc_resource_capability.clone()).into();
-        let ctrl: u32 = VcResourceControlProto::from(self.vc_resource_control.clone()).into();
-        let sta: u16 = VcResourceStatusProto::from(self.vc_resource_status.clone()).into();
-        caps == 0 && ctrl ==0 && sta == 0
-    }
+    /// Register size (12 bytes)
+    pub const SIZE: usize = 4 + 4 + 2 + 2;
 }
-impl<'a> TryRead<'a, Endian> for ExtendedVirtualChannel {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let evc = ExtendedVirtualChannel {
-            vc_resource_capability: bytes.read_with::<u32>(offset, endian)?.into(),
-            vc_resource_control: bytes.read_with::<u32>(offset, endian)?.into(),
-            vc_resource_status: {
-                // Skip RsvdP part 18h - 19h Extended Virtual Channel structure
-                let _ = bytes.read_with::<u16>(offset, endian)?;
-                bytes.read_with::<u16>(offset, endian)?.into()
-            },
-        };
-        Ok((evc, *offset))
-    }
-}
-
-#[bitfield(bits = 32)]
-#[repr(u32)]
-pub struct VcResourceCapabilityProto {
-    hardware_fixed_arbitration: bool,
-    wrr_32_phases: bool,
-    wrr_64_phases: bool,
-    wrr_128_phases: bool,
-    time_based_wrr_128_phases: bool,
-    wrr_256_phases: bool,
-    rsvdp: B8,
-    advanced_packet_switching: bool,
-    reject_snoop_transactions: bool,
-    maximum_time_slots: B7,
-    rsvdp_2: B1,
-    port_arbitration_table_offset: u8,
-}
-impl From<VcResourceCapability> for VcResourceCapabilityProto {
-    fn from(data: VcResourceCapability) -> Self {
-        let pac = data.port_arbitration_capability;
-        Self::new()
-            .with_hardware_fixed_arbitration(pac.hardware_fixed_arbitration)
-            .with_wrr_32_phases(pac.wrr_32_phases)
-            .with_wrr_64_phases(pac.wrr_64_phases)
-            .with_wrr_128_phases(pac.wrr_128_phases)
-            .with_time_based_wrr_128_phases(pac.time_based_wrr_128_phases)
-            .with_wrr_256_phases(pac.wrr_256_phases)
-            .with_rsvdp(0)
-            .with_advanced_packet_switching(data.advanced_packet_switching)
-            .with_reject_snoop_transactions(data.reject_snoop_transactions)
-            .with_maximum_time_slots(data.maximum_time_slots)
-            .with_rsvdp_2(0)
-            .with_port_arbitration_table_offset(data.port_arbitration_table_offset)
+impl From<[u8; Self::SIZE]> for ExtendedVirtualChannel {
+    fn from(data: [u8; Self::SIZE]) -> Self {
+        let Le((vc_resource_capability, vc_resource_control, r, vc_resource_status)) =
+            P4(data).into();
+        let _: u16 = r;
+        Self {
+            vc_resource_capability: From::<u32>::from(vc_resource_capability),
+            vc_resource_control: From::<u32>::from(vc_resource_control),
+            vc_resource_status: From::<u16>::from(vc_resource_status),
+        }
     }
 }
 
@@ -270,30 +318,41 @@ pub struct VcResourceCapability {
     /// Indicates the location of the Port Arbitration Table associated with the VC resource.
     pub port_arbitration_table_offset: u8,
 }
-impl From<VcResourceCapabilityProto> for VcResourceCapability {
-    fn from(proto: VcResourceCapabilityProto) -> Self {
-        let _ = proto.rsvdp();
-        let _ = proto.rsvdp_2();
+
+impl From<u32> for VcResourceCapability {
+    fn from(dword: u32) -> Self {
+        let Lsb((
+            hardware_fixed_arbitration,
+            wrr_32_phases,
+            wrr_64_phases,
+            wrr_128_phases,
+            time_based_wrr_128_phases,
+            wrr_256_phases,
+            reserved,
+            (),
+            advanced_packet_switching,
+            reject_snoop_transactions,
+            maximum_time_slots,
+            (),
+            port_arbitration_table_offset,
+        )) = P13::<_, 1, 1, 1, 1, 1, 1, 2, 6, 1, 1, 7, 1, 8>(dword).into();
         Self {
             port_arbitration_capability: PortArbitrationCapability {
-                hardware_fixed_arbitration: proto.hardware_fixed_arbitration(),
-                wrr_32_phases: proto.wrr_32_phases(),
-                wrr_64_phases: proto.wrr_64_phases(),
-                wrr_128_phases: proto.wrr_128_phases(),
-                time_based_wrr_128_phases: proto.time_based_wrr_128_phases(),
-                wrr_256_phases: proto.wrr_256_phases(),
+                hardware_fixed_arbitration,
+                wrr_32_phases,
+                wrr_64_phases,
+                wrr_128_phases,
+                time_based_wrr_128_phases,
+                wrr_256_phases,
+                reserved,
             },
-            advanced_packet_switching: proto.advanced_packet_switching(),
-            reject_snoop_transactions: proto.reject_snoop_transactions(),
-            maximum_time_slots: proto.maximum_time_slots(),
-            port_arbitration_table_offset: proto.port_arbitration_table_offset(),
+            advanced_packet_switching,
+            reject_snoop_transactions,
+            maximum_time_slots,
+            port_arbitration_table_offset,
         }
     }
 }
-impl From<u32> for VcResourceCapability {
-    fn from(dword: u32) -> Self { VcResourceCapabilityProto::from(dword).into() }
-}
-
 
 /// Indicates types of Port Arbitration supported by the VC resource
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -310,8 +369,9 @@ pub struct PortArbitrationCapability {
     pub time_based_wrr_128_phases: bool,
     /// WRR arbitration with 256 phases
     pub wrr_256_phases: bool,
+    /// Bits 6-7 Reserved
+    pub reserved: u8,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct PortArbitrationTable<'a> {
@@ -322,7 +382,12 @@ pub struct PortArbitrationTable<'a> {
 }
 impl<'a> PortArbitrationTable<'a> {
     pub fn new(data: &'a [u8], entry_size_bits: usize) -> Self {
-        Self { data: data.iter(), entry_size_bits, shift: 0, byte: 0 }
+        Self {
+            data: data.iter(),
+            entry_size_bits,
+            shift: 0,
+            byte: 0,
+        }
     }
 }
 impl<'a> Iterator for PortArbitrationTable<'a> {
@@ -346,41 +411,14 @@ impl<'a> Iterator for PortArbitrationTable<'a> {
 impl<'a> PartialEq for PortArbitrationTable<'a> {
     fn eq(&self, other: &Self) -> bool {
         self.data.clone().eq(other.data.clone())
-        && self.entry_size_bits == other.entry_size_bits
-        && self.shift == other.shift
+            && self.entry_size_bits == other.entry_size_bits
+            && self.shift == other.shift
     }
 }
 impl<'a> Eq for PortArbitrationTable<'a> {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PortArbitrationTableEntry(u8);
-
-
-#[bitfield(bits = 32)]
-#[repr(u32)]
-pub struct VcResourceControlProto {
-    tc_or_vc_map: u8,
-    rsvdp: B8,
-    load_port_arbitration_table: bool,
-    port_arbitration_select: B3,
-    rsvdp_2: B4,
-    vc_id: B3,
-    rsvdp_3: B4,
-    vc_enable: bool,
-}
-impl From<VcResourceControl> for VcResourceControlProto {
-    fn from(data: VcResourceControl) -> Self {
-        Self::new()
-            .with_tc_or_vc_map(data.tc_or_vc_map)
-            .with_rsvdp(0)
-            .with_load_port_arbitration_table(data.load_port_arbitration_table)
-            .with_port_arbitration_select(data.port_arbitration_select.into())
-            .with_rsvdp_2(0)
-            .with_vc_id(data.vc_id)
-            .with_rsvdp_3(0)
-            .with_vc_enable(data.vc_enable)
-    }
-}
 
 /// VC Resource Control
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -396,22 +434,27 @@ pub struct VcResourceControl {
     /// VC Enable
     pub vc_enable: bool,
 }
-impl From<VcResourceControlProto> for VcResourceControl {
-    fn from(proto: VcResourceControlProto) -> Self {
-        let _ = proto.rsvdp();
-        let _ = proto.rsvdp_2();
-        let _ = proto.rsvdp_3();
+
+impl From<u32> for VcResourceControl {
+    fn from(dword: u32) -> Self {
+        let Lsb((
+            tc_or_vc_map,
+            (),
+            load_port_arbitration_table,
+            port_arbitration_select,
+            (),
+            vc_id,
+            (),
+            vc_enable,
+        )) = P8::<_, 8, 8, 1, 3, 4, 3, 4, 1>(dword).into();
         Self {
-            tc_or_vc_map: proto.tc_or_vc_map(),
-            load_port_arbitration_table: proto.load_port_arbitration_table(),
-            port_arbitration_select: proto.port_arbitration_select().into(),
-            vc_id: proto.vc_id(),
-            vc_enable: proto.vc_enable(),
+            tc_or_vc_map,
+            load_port_arbitration_table,
+            port_arbitration_select: From::<u8>::from(port_arbitration_select),
+            vc_id,
+            vc_enable,
         }
     }
-}
-impl From<u32> for VcResourceControl {
-    fn from(dword: u32) -> Self { VcResourceControlProto::from(dword).into() }
 }
 
 /// Corresponding to one of the filed in the (Port Arbitration
@@ -443,7 +486,7 @@ impl PortArbitrationSelect {
             Self::Wrr128phases => 128,
             Self::TimeBasedWrr128phases => 128,
             Self::Wrr256phases => 256,
-            Self::Reserved(_) => 0
+            Self::Reserved(_) => 0,
         }
     }
 }
@@ -456,7 +499,7 @@ impl From<u8> for PortArbitrationSelect {
             0b011 => Self::Wrr128phases,
             0b100 => Self::TimeBasedWrr128phases,
             0b101 => Self::Wrr256phases,
-                v => Self::Reserved(v),
+            v => Self::Reserved(v),
         }
     }
 }
@@ -474,22 +517,6 @@ impl From<PortArbitrationSelect> for u8 {
     }
 }
 
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct VcResourceStatusProto {
-    port_arbitration_table_status: bool,
-    vc_negotiation_pending: bool,
-    rsvdz: B14,
-}
-impl From<VcResourceStatus> for VcResourceStatusProto {
-    fn from(data: VcResourceStatus) -> Self {
-        Self::new()
-            .with_port_arbitration_table_status(data.port_arbitration_table_status)
-            .with_vc_negotiation_pending(data.vc_negotiation_pending)
-            .with_rsvdz(0)
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VcResourceStatus {
     /// Port Arbitration Table Status
@@ -497,34 +524,18 @@ pub struct VcResourceStatus {
     /// VC Negotiation Pending
     pub vc_negotiation_pending: bool,
 }
-impl From<VcResourceStatusProto> for VcResourceStatus {
-    fn from(proto: VcResourceStatusProto) -> Self {
-        let _ = proto.rsvdz();
+
+impl From<u16> for VcResourceStatus {
+    fn from(word: u16) -> Self {
+        let Lsb((port_arbitration_table_status, vc_negotiation_pending, ())) =
+            P3::<_, 1, 1, 14>(word).into();
         Self {
-            port_arbitration_table_status: proto.port_arbitration_table_status(),
-            vc_negotiation_pending: proto.vc_negotiation_pending(),
+            port_arbitration_table_status,
+            vc_negotiation_pending,
         }
     }
 }
-impl From<u16> for VcResourceStatus {
-    fn from(word: u16) -> Self { VcResourceStatusProto::from(word).into() }
-}
 
-
-#[bitfield(bits = 32)]
-#[repr(u32)]
-pub struct PortVcCapability2Proto {
-    // VC Arbitration Capability
-    hardware_fixed_arbitration: bool,
-    wrr_32_phases: bool,
-    wrr_64_phases: bool,
-    wrr_128_phases: bool,
-    rsvdp: B4,
-    // Reserved
-    rsvdp_2: B16,
-    // VC Arbitration Table Offset
-    vc_arbitration_table_offset: u8,
-}
 /// The Port VC Capability register 2 provides further information about the configuration of the
 /// Virtual Channels associated with a PCI Express Port.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -535,25 +546,30 @@ pub struct PortVcCapability2 {
     /// address of the Virtual Channel Capability structure.
     pub vc_arbitration_table_offset: u8,
 }
-impl From<PortVcCapability2Proto> for PortVcCapability2 {
-    fn from(proto: PortVcCapability2Proto) -> Self {
-        let _ = proto.rsvdp();
-        let _ = proto.rsvdp_2();
+
+impl From<u32> for PortVcCapability2 {
+    fn from(dword: u32) -> Self {
+        let Lsb((
+            hardware_fixed_arbitration,
+            wrr_32_phases,
+            wrr_64_phases,
+            wrr_128_phases,
+            reserved,
+            (),
+            vc_arbitration_table_offset,
+        )) = P7::<_, 1, 1, 1, 1, 4, 16, 8>(dword).into();
         Self {
             vc_arbitration_capability: VcArbitrationCapability {
-                hardware_fixed_arbitration: proto.hardware_fixed_arbitration(),
-                wrr_32_phases: proto.wrr_32_phases(),
-                wrr_64_phases: proto.wrr_64_phases(),
-                wrr_128_phases: proto.wrr_128_phases(),
+                hardware_fixed_arbitration,
+                wrr_32_phases,
+                wrr_64_phases,
+                wrr_128_phases,
+                reserved,
             },
-            vc_arbitration_table_offset: proto.vc_arbitration_table_offset(),
+            vc_arbitration_table_offset,
         }
     }
 }
-impl From<u32> for PortVcCapability2 {
-    fn from(dword: u32) -> Self { PortVcCapability2Proto::from(dword).into() }
-}
-
 
 /// Indicates the types of VC Arbitration supported by the Function for the LPVC group.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -566,18 +582,23 @@ pub struct VcArbitrationCapability {
     pub wrr_64_phases: bool,
     /// WRR arbitration with 128 phases
     pub wrr_128_phases: bool,
+    /// Bits 4-7 reserved
+    pub reserved: u8,
 }
 
 /// The VC Arbitration Table is a read-write register array that is used to store the arbitration
 /// table for VC Arbitration
 #[derive(Debug, Clone)]
-pub struct VcArbitrationTable<'a>{
+pub struct VcArbitrationTable<'a> {
     data: slice::Iter<'a, u8>,
-    vate: Option<VcArbitrationTableEntry>
+    vate: Option<VcArbitrationTableEntry>,
 }
 impl<'a> VcArbitrationTable<'a> {
     pub fn new(data: &'a [u8]) -> Self {
-        Self { data: data.iter(), vate: None }
+        Self {
+            data: data.iter(),
+            vate: None,
+        }
     }
 }
 impl<'a> Iterator for VcArbitrationTable<'a> {
@@ -613,21 +634,16 @@ impl From<u8> for VatePair {
     /// One byte contains two [VcArbitrationTableEntry]
     fn from(byte: u8) -> Self {
         Self([
-            VcArbitrationTableEntry { vc_id: byte & 0b111 },
-            VcArbitrationTableEntry { vc_id: (byte >> 4) & 0b111 },
+            VcArbitrationTableEntry {
+                vc_id: byte & 0b111,
+            },
+            VcArbitrationTableEntry {
+                vc_id: (byte >> 4) & 0b111,
+            },
         ])
     }
 }
 
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct PortVcControlProto {
-    load_vc_arbitration_table: bool,
-    vc_arbitration_select: B3,
-    rsvdp: B12,
-}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PortVcControl {
     /// Load VC Arbitration Table
@@ -635,17 +651,16 @@ pub struct PortVcControl {
     /// VC Arbitration Select
     pub vc_arbitration_select: VcArbitrationSelect,
 }
-impl From<PortVcControlProto> for PortVcControl {
-    fn from(proto: PortVcControlProto) -> Self {
-        let _ = proto.rsvdp();
+
+impl From<u16> for PortVcControl {
+    fn from(word: u16) -> Self {
+        let Lsb((load_vc_arbitration_table, vc_arbitration_select, ())) =
+            P3::<_, 1, 3, 12>(word).into();
         Self {
-            load_vc_arbitration_table: proto.load_vc_arbitration_table(),
-            vc_arbitration_select: proto.vc_arbitration_select().into(),
+            load_vc_arbitration_table,
+            vc_arbitration_select: From::<u8>::from(vc_arbitration_select),
         }
     }
-}
-impl From<u16> for PortVcControl {
-    fn from(word: u16) -> Self { PortVcControlProto::from(word).into() }
 }
 
 /// The values of this field are corresponding to one of the field in the
@@ -682,19 +697,11 @@ impl From<u8> for VcArbitrationSelect {
             0b001 => Self::Wrr32phases,
             0b010 => Self::Wrr64phases,
             0b011 => Self::Wrr128phases,
-                v => Self::Reserved(v),
+            v => Self::Reserved(v),
         }
     }
 }
 
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct PortVcStatusProto {
-    vc_arbitration_table_status: bool,
-    rsvdp: B15,
-}
 /// The Port VC Status register provides status of the configuration of Virtual Channels associated
 /// with a Port.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -702,25 +709,21 @@ pub struct PortVcStatus {
     /// VC Arbitration Table Status
     pub vc_arbitration_table_status: bool,
 }
-impl From<PortVcStatusProto> for PortVcStatus {
-    fn from(proto: PortVcStatusProto) -> Self {
-        let _ = proto.rsvdp();
+
+impl From<u16> for PortVcStatus {
+    fn from(word: u16) -> Self {
+        let Lsb((vc_arbitration_table_status, ())) = P2::<_, 1, 15>(word).into();
         Self {
-            vc_arbitration_table_status: proto.vc_arbitration_table_status(),
+            vc_arbitration_table_status,
         }
     }
 }
-impl From<u16> for PortVcStatus {
-    fn from(word: u16) -> Self { PortVcStatusProto::from(word).into() }
-}
-
-
 
 #[cfg(test)]
 mod tests {
-    use std::prelude::v1::*;
-    use pretty_assertions::assert_eq;
     use super::*;
+    use pretty_assertions::assert_eq;
+    use std::prelude::v1::*;
 
     #[test]
     fn port_vc_capability_1() {
@@ -745,6 +748,7 @@ mod tests {
                 wrr_32_phases: true,
                 wrr_64_phases: false,
                 wrr_128_phases: true,
+                reserved: 0b1010,
             },
             vc_arbitration_table_offset: 0xf,
         };
@@ -784,6 +788,7 @@ mod tests {
                 wrr_128_phases: true,
                 time_based_wrr_128_phases: false,
                 wrr_256_phases: true,
+                reserved: 0b10,
             },
             advanced_packet_switching: true,
             reject_snoop_transactions: true,
@@ -820,7 +825,7 @@ mod tests {
 
     #[test]
     fn vc_arbitration_table() {
-        let data = [0x10,0x23];
+        let data = [0x10, 0x23];
         let result = VcArbitrationTable::new(&data).collect::<Vec<_>>();
         let sample = vec![
             VcArbitrationTableEntry { vc_id: 0 },
@@ -835,46 +840,156 @@ mod tests {
     fn port_arbitration_table_entry_size() {
         use PortArbitrationTableEntry as E;
         let data = [
-            0x01,0x23,0x45,0x67, 0x89,0xab,0xcd,0xef,
-            0x01,0x23,0x45,0x67, 0x89,0xab,0xcd,0xef,
-
-            0x01,0x23,0x45,0x67, 0x89,0xab,0xcd,0xef,
-            0x01,0x23,0x45,0x67, 0x89,0xab,0xcd,0xef,
+            0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab,
+            0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67,
+            0x89, 0xab, 0xcd, 0xef,
         ];
 
         let result = PortArbitrationTable::new(&data[..4], 1).collect::<Vec<_>>();
         let sample = vec![
-            E(1), E(0), E(0), E(0), E(0), E(0), E(0), E(0),
-            E(1), E(1), E(0), E(0), E(0), E(1), E(0), E(0),
-            E(1), E(0), E(1), E(0), E(0), E(0), E(1), E(0),
-            E(1), E(1), E(1), E(0), E(0), E(1), E(1), E(0),
+            E(1),
+            E(0),
+            E(0),
+            E(0),
+            E(0),
+            E(0),
+            E(0),
+            E(0),
+            E(1),
+            E(1),
+            E(0),
+            E(0),
+            E(0),
+            E(1),
+            E(0),
+            E(0),
+            E(1),
+            E(0),
+            E(1),
+            E(0),
+            E(0),
+            E(0),
+            E(1),
+            E(0),
+            E(1),
+            E(1),
+            E(1),
+            E(0),
+            E(0),
+            E(1),
+            E(1),
+            E(0),
         ];
         assert_eq!(sample, result, "Entry size: 1 bit");
 
         let result = PortArbitrationTable::new(&data[..8], 2).collect::<Vec<_>>();
         let sample = vec![
-            E(1),E(0),E(0),E(0), E(3),E(0),E(2),E(0),
-            E(1),E(1),E(0),E(1), E(3),E(1),E(2),E(1),
-            E(1),E(2),E(0),E(2), E(3),E(2),E(2),E(2),
-            E(1),E(3),E(0),E(3), E(3),E(3),E(2),E(3),
+            E(1),
+            E(0),
+            E(0),
+            E(0),
+            E(3),
+            E(0),
+            E(2),
+            E(0),
+            E(1),
+            E(1),
+            E(0),
+            E(1),
+            E(3),
+            E(1),
+            E(2),
+            E(1),
+            E(1),
+            E(2),
+            E(0),
+            E(2),
+            E(3),
+            E(2),
+            E(2),
+            E(2),
+            E(1),
+            E(3),
+            E(0),
+            E(3),
+            E(3),
+            E(3),
+            E(2),
+            E(3),
         ];
         assert_eq!(sample, result, "Entry size: 2 bit");
 
         let result = PortArbitrationTable::new(&data[..16], 4).collect::<Vec<_>>();
         let sample = vec![
-            E(0x1),E(0x0), E(0x3),E(0x2), E(0x5),E(0x4), E(0x7),E(0x6),
-            E(0x9),E(0x8), E(0xb),E(0xa), E(0xd),E(0xc), E(0xf),E(0xe),
-            E(0x1),E(0x0), E(0x3),E(0x2), E(0x5),E(0x4), E(0x7),E(0x6),
-            E(0x9),E(0x8), E(0xb),E(0xa), E(0xd),E(0xc), E(0xf),E(0xe),
+            E(0x1),
+            E(0x0),
+            E(0x3),
+            E(0x2),
+            E(0x5),
+            E(0x4),
+            E(0x7),
+            E(0x6),
+            E(0x9),
+            E(0x8),
+            E(0xb),
+            E(0xa),
+            E(0xd),
+            E(0xc),
+            E(0xf),
+            E(0xe),
+            E(0x1),
+            E(0x0),
+            E(0x3),
+            E(0x2),
+            E(0x5),
+            E(0x4),
+            E(0x7),
+            E(0x6),
+            E(0x9),
+            E(0x8),
+            E(0xb),
+            E(0xa),
+            E(0xd),
+            E(0xc),
+            E(0xf),
+            E(0xe),
         ];
         assert_eq!(sample, result, "Entry size: 4 bit");
 
         let result = PortArbitrationTable::new(&data, 8).collect::<Vec<_>>();
         let sample = vec![
-            E(0x01), E(0x23), E(0x45), E(0x67), E(0x89), E(0xab), E(0xcd), E(0xef),
-            E(0x01), E(0x23), E(0x45), E(0x67), E(0x89), E(0xab), E(0xcd), E(0xef),
-            E(0x01), E(0x23), E(0x45), E(0x67), E(0x89), E(0xab), E(0xcd), E(0xef),
-            E(0x01), E(0x23), E(0x45), E(0x67), E(0x89), E(0xab), E(0xcd), E(0xef),
+            E(0x01),
+            E(0x23),
+            E(0x45),
+            E(0x67),
+            E(0x89),
+            E(0xab),
+            E(0xcd),
+            E(0xef),
+            E(0x01),
+            E(0x23),
+            E(0x45),
+            E(0x67),
+            E(0x89),
+            E(0xab),
+            E(0xcd),
+            E(0xef),
+            E(0x01),
+            E(0x23),
+            E(0x45),
+            E(0x67),
+            E(0x89),
+            E(0xab),
+            E(0xcd),
+            E(0xef),
+            E(0x01),
+            E(0x23),
+            E(0x45),
+            E(0x67),
+            E(0x89),
+            E(0xab),
+            E(0xcd),
+            E(0xef),
         ];
         assert_eq!(sample, result, "Entry size: 8 bit");
     }
@@ -886,26 +1001,26 @@ mod tests {
             // Arb:    Fixed- WRR32- WRR64- WRR128- TWRR128- WRR256-
             // Ctrl:   Enable+ ID=0 ArbSelect=Fixed TC/VC=ff
             // Status: NegoPending- InProgress-
-            0x00,0x00,0x00,0x00,0xff,0x00,0x00,0x80,0x00,0x00,0x00,0x00,
-            
+            0x00, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00,
             // Caps:   PATOffset=02 MaxTimeSlots=1 RejSnoopTrans-
             // Arb:    Fixed+ WRR32+ WRR64- WRR128- TWRR128- WRR256-
             // Ctrl:   Enable+ ID=0 ArbSelect=Fixed TC/VC=ff
             // Status: NegoPending- InProgress-
             // Port Arbitration Table <?>
-            0x03,0x00,0x00,0x02,0xff,0x00,0x00,0x80,0x00,0x00,0x00,0x00,
+            0x03, 0x00, 0x00, 0x02, 0xff, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00,
         ];
         let result = ExtendedVirtualChannels::new(&data, 2).collect::<Vec<_>>();
         let sample = vec![
-            ExtendedVirtualChannel {
+            Ok(ExtendedVirtualChannel {
                 vc_resource_capability: VcResourceCapability {
                     port_arbitration_capability: PortArbitrationCapability {
-                            hardware_fixed_arbitration: false,
-                            wrr_32_phases: false,
-                            wrr_64_phases: false,
-                            wrr_128_phases: false,
-                            time_based_wrr_128_phases: false,
-                            wrr_256_phases: false,
+                        hardware_fixed_arbitration: false,
+                        wrr_32_phases: false,
+                        wrr_64_phases: false,
+                        wrr_128_phases: false,
+                        time_based_wrr_128_phases: false,
+                        wrr_256_phases: false,
+                        reserved: 0b00,
                     },
                     advanced_packet_switching: false,
                     reject_snoop_transactions: false,
@@ -923,16 +1038,17 @@ mod tests {
                     port_arbitration_table_status: false,
                     vc_negotiation_pending: false,
                 },
-            },
-            ExtendedVirtualChannel {
+            }),
+            Ok(ExtendedVirtualChannel {
                 vc_resource_capability: VcResourceCapability {
                     port_arbitration_capability: PortArbitrationCapability {
-                            hardware_fixed_arbitration: true,
-                            wrr_32_phases: true,
-                            wrr_64_phases: false,
-                            wrr_128_phases: false,
-                            time_based_wrr_128_phases: false,
-                            wrr_256_phases: false,
+                        hardware_fixed_arbitration: true,
+                        wrr_32_phases: true,
+                        wrr_64_phases: false,
+                        wrr_128_phases: false,
+                        time_based_wrr_128_phases: false,
+                        wrr_256_phases: false,
+                        reserved: 0b00,
                     },
                     advanced_packet_switching: false,
                     reject_snoop_transactions: false,
@@ -950,9 +1066,8 @@ mod tests {
                     port_arbitration_table_status: false,
                     vc_negotiation_pending: false,
                 },
-            },
+            }),
         ];
         assert_eq!(sample, result);
     }
-
 }
