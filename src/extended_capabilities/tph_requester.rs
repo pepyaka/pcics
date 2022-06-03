@@ -1,62 +1,122 @@
-//! TPH Requester
-//!
-//! TLP Processing Hints is an optional feature that provides hints in Request TLP headers to
-//! facilitate optimized processing of Requests that target Memory Space.
+/*!
+# TPH Requester
 
+TLP Processing Hints is an optional feature that provides hints in Request TLP headers to
+facilitate optimized processing of Requests that target Memory Space.
 
-use modular_bitfield::prelude::*;
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
+## Struct diagram
+[TphRequester]
+- [TphRequesterCapability]
+  - [StTable]
+- [TphRequesterControl]
+  - [StModeSelect]
+  - [TphRequesterEnable]
+
+## Examples
+
+```rust
+# use pcics::extended_capabilities::tph_requester::*;
+use pretty_assertions::assert_eq;
+let data = [
+    0x17, 0x00, 0x01, 0x1c, 0x05, 0x02, 0x07, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+];
+let result: TphRequester = data[4..].try_into().unwrap();
+let sample = TphRequester {
+    tph_requester_capability: TphRequesterCapability {
+        no_st_mode_supported: true,
+        interrupt_vector_mode_supported: false,
+        device_specific_mode_supported: true,
+        extended_tph_requester_supported: false,
+        st_table: StTable::Valid { size: 0x07, data: [0u8; 16].as_slice() },
+    },
+    tph_requester_control: TphRequesterControl {
+        st_mode_select: StModeSelect::NoStMode,
+        tph_requester_enable: TphRequesterEnable::NotPermitted,
+    },
 };
+assert_eq!(sample, result);
+```
+*/
+
+use heterob::{bit_numbering::Lsb, endianness::Le, Seq, P2, P4, P9};
+
+use super::ExtendedCapabilityDataError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TphRequester<'a> {
-    data: &'a [u8],
     /// TPH Requester Capability
-    pub tph_requester_capability: TphRequesterCapability,
+    pub tph_requester_capability: TphRequesterCapability<'a>,
     /// TPH Requester Control
     pub tph_requester_control: TphRequesterControl,
 }
 
-impl<'a> TphRequester<'a> {
-    pub fn tph_st_table(&self) -> TphStTable {
-        TphStTable::new(self.data)
-    }
-}
-impl<'a> TryRead<'a, Endian> for TphRequester<'a> {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let tphr = TphRequester {
-            data: bytes,
-            tph_requester_capability: bytes.read_with::<u32>(offset, endian)?.into(),
-            tph_requester_control: bytes.read_with::<u32>(offset, endian)?.into(),
+impl<'a> TryFrom<&'a [u8]> for TphRequester<'a> {
+    type Error = ExtendedCapabilityDataError;
+
+    fn try_from(slice: &'a [u8]) -> Result<Self, Self::Error> {
+        let Seq {
+            head: Le((tph_requester_capability, tph_requester_control)),
+            tail,
+        } = P2(slice)
+            .try_into()
+            .map_err(|_| ExtendedCapabilityDataError {
+                name: "TPH Requester",
+                size: 8,
+            })?;
+        let Lsb((
+            no_st_mode_supported,
+            interrupt_vector_mode_supported,
+            device_specific_mode_supported,
+            (),
+            extended_tph_requester_supported,
+            st_table_location,
+            (),
+            st_table_size,
+            (),
+        )) = P9::<u32, 1, 1, 1, 5, 1, 2, 5, 11, 5>(tph_requester_capability).into();
+        let _: (u8, u16) = (st_table_location, st_table_size);
+        // 0Ch + (ST Table Size * 02h) + 02h
+        let end = (st_table_size as usize) * 2 + 2;
+        let st_table = match st_table_location {
+            0b00 => StTable::NotPresent,
+            0b01 => {
+                if let (0..=63, Some(data)) = (st_table_size, tail.get(..end)) {
+                    StTable::Valid {
+                        size: st_table_size,
+                        data,
+                    }
+                } else {
+                    StTable::Invalid {
+                        size: st_table_size,
+                        data: tail,
+                    }
+                }
+            }
+            0b10 => StTable::MsiXTable {
+                size: st_table_size,
+            },
+            0b11 => StTable::Reserved,
+            _ => unreachable!(),
         };
-        Ok((tphr, *offset))
+        Ok(Self {
+            tph_requester_capability: TphRequesterCapability {
+                no_st_mode_supported,
+                interrupt_vector_mode_supported,
+                device_specific_mode_supported,
+                extended_tph_requester_supported,
+                st_table,
+            },
+            tph_requester_control: From::<u32>::from(tph_requester_control),
+        })
     }
-}
-
-
-#[bitfield(bits = 32)]
-#[repr(u32)]
-pub struct TphRequesterCapabilityProto {
-    no_st_mode_supported: bool,
-    interrupt_vector_mode_supported: bool,
-    device_specific_mode_supported: bool,
-    rsvdp: B5,
-    extended_tph_requester_supported: bool,
-    st_table_location: B2,
-    rsvdp_2: B5,
-    st_table_size: B11,
-    rsvdp_3: B5,
 }
 
 /// TPH Requester Capability
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TphRequesterCapability {
+pub struct TphRequesterCapability<'a> {
     /// No ST Mode Supported
     pub no_st_mode_supported: bool,
     /// Interrupt Vector Mode Supported
@@ -65,62 +125,32 @@ pub struct TphRequesterCapability {
     pub device_specific_mode_supported: bool,
     /// Extended TPH Requester Supported
     pub extended_tph_requester_supported: bool,
-    /// ST Table Location
-    pub st_table_location: StTableLocation,
-    /// ST Table Size
-    pub st_table_size: u16,
-}
-impl From<TphRequesterCapabilityProto> for TphRequesterCapability {
-    fn from(proto: TphRequesterCapabilityProto) -> Self {
-        let _ = proto.rsvdp();
-        let _ = proto.rsvdp_2();
-        let _ = proto.rsvdp_3();
-        Self {
-            no_st_mode_supported: proto.no_st_mode_supported(),
-            interrupt_vector_mode_supported: proto.interrupt_vector_mode_supported(),
-            device_specific_mode_supported: proto.device_specific_mode_supported(),
-            extended_tph_requester_supported: proto.extended_tph_requester_supported(),
-            st_table_location: proto.st_table_location().into(),
-            st_table_size: proto.st_table_size(),
-        }
-    }
-}
-impl From<u32> for TphRequesterCapability {
-    fn from(dword: u32) -> Self { TphRequesterCapabilityProto::from(dword).into() }
+    /// ST Table
+    pub st_table: StTable<'a>,
 }
 
 /// Indicates if and where the ST Table is located
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StTableLocation {
+pub enum StTable<'a> {
     /// ST Table is not present
     NotPresent,
-    /// ST Table is located in the TPH Requester Capability structure
-    TphRequesterCapability,
+    /// ST Table is located in the TPH Requester Capability structure and all bytes are readable
+    Valid { size: u16, data: &'a [u8] },
+    /// ST Table is located in the TPH Requester Capability structure, but has invalid size.
+    ///
+    /// Bytes slice may be shorter or limit of 64 entries exceeded
+    Invalid { size: u16, data: &'a [u8] },
     /// ST Table is located in the MSI-X Table
-    MsiXTable,
+    MsiXTable { size: u16 },
     /// Reserved
     Reserved,
 }
-impl From<u8> for StTableLocation {
-    fn from(byte: u8) -> Self {
-        match byte {
-            0b00 => Self::NotPresent,
-            0b01 => Self::TphRequesterCapability,
-            0b10 => Self::MsiXTable,
-            0b11 => Self::Reserved,
-            _ => unreachable!(),
-        }
-    }
-}
 
-
-#[bitfield(bits = 32)]
-#[repr(u32)]
-pub struct TphRequesterControlProto {
-    st_mode_select: B3,
-    rsvdp: B5,
-    tph_requester_enable: B2,
-    rsvdp_2: B22,
+/// Each implemented ST Entry is 16 bits
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TphStTableEntry {
+    pub st_lower: u8,
+    pub st_upper: u8,
 }
 
 /// TPH Requester Control
@@ -131,18 +161,16 @@ pub struct TphRequesterControl {
     /// TPH Requester Enable
     pub tph_requester_enable: TphRequesterEnable,
 }
-impl From<TphRequesterControlProto> for TphRequesterControl {
-    fn from(proto: TphRequesterControlProto) -> Self {
-        let _ = proto.rsvdp();
-        let _ = proto.rsvdp_2();
+
+impl From<u32> for TphRequesterControl {
+    fn from(dword: u32) -> Self {
+        let Lsb((st_mode_select, (), tph_requester_enable, ())) =
+            P4::<_, 3, 5, 2, 22>(dword).into();
         Self {
-            st_mode_select: proto.st_mode_select().into(),
-            tph_requester_enable: proto.tph_requester_enable().into(),
+            st_mode_select: From::<u8>::from(st_mode_select),
+            tph_requester_enable: From::<u8>::from(tph_requester_enable),
         }
     }
-}
-impl From<u32> for TphRequesterControl {
-    fn from(dword: u32) -> Self { TphRequesterControlProto::from(dword).into() }
 }
 
 /// Selects the ST Mode of operation
@@ -163,7 +191,7 @@ impl From<u8> for StModeSelect {
             0b00 => Self::NoStMode,
             0b01 => Self::InterruptVectorMode,
             0b10 => Self::DeviceSpecificMode,
-               v => Self::Reserved(v),
+            v => Self::Reserved(v),
         }
     }
 }
@@ -192,27 +220,4 @@ impl From<u8> for TphRequesterEnable {
             _ => unreachable!(),
         }
     }
-}
-
-/// TPH ST Table - an iterator through ST Table entries
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TphStTable<'a>(&'a [u8]);
-impl<'a> TphStTable<'a> {
-    pub fn new(data: &'a [u8]) -> Self {
-        Self(data)
-    }
-}
-impl<'a> Iterator for TphStTable<'a> {
-    type Item = TphStTableEntry;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        todo!()
-    }
-}
-
-/// Each implemented ST Entry is 16 bits 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TphStTableEntry {
-    pub st_lower: u8,
-    pub st_upper: u8,
 }
