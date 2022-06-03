@@ -1,14 +1,40 @@
-//! Address Translation Services (ATS)
+/*!
+# Address Translation Services (ATS)
 
-use modular_bitfield::prelude::*;
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
+ATS extends the PCIe protocol to support an address translation agent (TA) that
+translates DMA addresses to cached addresses in the device.
+
+## Struct diagram
+[AddressTranslationServices]
+- [AtsCapability]
+- [AtsControl]
+
+## Examples
+
+```rust
+# use pcics::extended_capabilities::address_translation_services::*;
+let data = [
+    0x0f, 0x00, 0x00, 0x00, 0x24, 0x00, 0x02, 0x00,
+];
+let result = data[4..].try_into().unwrap();
+let sample = AddressTranslationServices {
+    ats_capability: AtsCapability {
+        invalidate_queue_depth: 4,
+        page_aligned_request: true,
+        global_invalidate_supported: false,
+    },
+    ats_control: AtsControl {
+        smallest_translation_unit: 2,
+        enable: false,
+    }
 };
+assert_eq!(sample, result);
+```
+*/
 
+use heterob::{bit_numbering::Lsb, endianness::Le, Seq, P2, P3, P4};
+
+use super::ExtendedCapabilityDataError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AddressTranslationServices {
@@ -17,24 +43,24 @@ pub struct AddressTranslationServices {
     /// ATS Control
     pub ats_control: AtsControl,
 }
-impl<'a> TryRead<'a, Endian> for AddressTranslationServices {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let ats = AddressTranslationServices {
-            ats_capability: bytes.read_with::<u16>(offset, endian)?.into(),
-            ats_control: bytes.read_with::<u16>(offset, endian)?.into(),
-        };
-        Ok((ats, *offset))
-    }
-}
+impl TryFrom<&[u8]> for AddressTranslationServices {
+    type Error = ExtendedCapabilityDataError;
 
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct AtsCapabilityProto {
-    invalidate_queue_depth: B5,
-    page_aligned_request: bool,
-    global_invalidate_supported: bool,
-    rsvdp: B9,
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
+        let Seq {
+            head: Le((ats_capability, ats_control)),
+            ..
+        } = P2(slice)
+            .try_into()
+            .map_err(|_| ExtendedCapabilityDataError {
+                name: "Address Translation Services",
+                size: 4,
+            })?;
+        Ok(Self {
+            ats_capability: From::<u16>::from(ats_capability),
+            ats_control: From::<u16>::from(ats_control),
+        })
+    }
 }
 
 /// ATS Capability
@@ -47,27 +73,17 @@ pub struct AtsCapability {
     /// Global Invalidate Supported
     pub global_invalidate_supported: bool,
 }
-impl From<AtsCapabilityProto> for AtsCapability {
-    fn from(proto: AtsCapabilityProto) -> Self {
-        let _ = proto.rsvdp();
+
+impl From<u16> for AtsCapability {
+    fn from(word: u16) -> Self {
+        let Lsb((invalidate_queue_depth, page_aligned_request, global_invalidate_supported, ())) =
+            P4::<_, 5, 1, 1, 9>(word).into();
         Self {
-            invalidate_queue_depth: proto.invalidate_queue_depth(),
-            page_aligned_request: proto.page_aligned_request(),
-            global_invalidate_supported: proto.global_invalidate_supported(),
+            invalidate_queue_depth,
+            page_aligned_request,
+            global_invalidate_supported,
         }
     }
-}
-impl From<u16> for AtsCapability {
-    fn from(word: u16) -> Self { AtsCapabilityProto::from(word).into() }
-}
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct AtsControlProto {
-    smallest_translation_unit: B5,
-    rsvdp: B10,
-    enable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,16 +93,13 @@ pub struct AtsControl {
     /// Enable (E)
     pub enable: bool,
 }
-impl From<AtsControlProto> for AtsControl {
-    fn from(proto: AtsControlProto) -> Self {
-        let _ = proto.rsvdp();
+
+impl From<u16> for AtsControl {
+    fn from(word: u16) -> Self {
+        let Lsb((smallest_translation_unit, (), enable)) = P3::<_, 5, 10, 1>(word).into();
         Self {
-            smallest_translation_unit: proto.smallest_translation_unit(),
-            enable: proto.enable(),
+            smallest_translation_unit,
+            enable,
         }
     }
 }
-impl From<u16> for AtsControl {
-    fn from(word: u16) -> Self { AtsControlProto::from(word).into() }
-}
-

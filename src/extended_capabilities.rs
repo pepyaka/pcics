@@ -221,8 +221,10 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
             0x000C => Kind::ConfigurationAccessCorrelation,
             0x000D => ecap_data.try_into().map(Kind::AccessControlServices)
                         .context(DataSnafu { offset })?,
-            0x000E => Kind::AlternativeRoutingIdInterpretation(bytes.read_with(ecap_data_offset, LE)?),
-            0x000F => Kind::AddressTranslationServices(bytes.read_with(ecap_data_offset, LE)?),
+            0x000E => ecap_data.try_into().map(Kind::AlternativeRoutingIdInterpretation)
+                        .context(DataSnafu { offset })?,
+            0x000F => ecap_data.try_into().map(Kind::AddressTranslationServices)
+                        .context(DataSnafu { offset })?,
             0x0010 => ecap_data.try_into().map(Kind::SingleRootIoVirtualization)
                         .context(DataSnafu { offset })?,
             0x0011 => Kind::MultiRootIoVirtualization,
