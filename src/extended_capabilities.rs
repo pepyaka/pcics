@@ -241,7 +241,8 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
             0x0019 => ecap_data.try_into().map(Kind::SecondaryPciExpress)
                         .context(DataSnafu { offset })?,
             0x001A => Kind::ProtocolMultiplexing,
-            0x001B => Kind::ProcessAddressSpaceId(bytes.read_with(ecap_data_offset, LE)?),
+            0x001B => ecap_data.try_into().map(Kind::ProcessAddressSpaceId)
+                        .context(DataSnafu { offset })?,
             0x001C => Kind::LnRequester,
             0x001D => Kind::DownstreamPortContainment(bytes.read_with(ecap_data_offset, LE)?),
             0x001E => ecap_data.try_into().map(Kind::L1PmSubstates)

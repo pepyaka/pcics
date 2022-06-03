@@ -1,44 +1,65 @@
-//! Process Address Space ID (PASID)
-//!
-//! The presence of a PASID Extended Capability indicates that the Endpoint supports sending and
-//! receiving TLPs containing a PASID TLP Prefix.
+/*!
+# Process Address Space ID (PASID)
 
+The presence of a PASID Extended Capability indicates that the Endpoint supports sending and
+receiving TLPs containing a PASID TLP Prefix.
 
-use modular_bitfield::prelude::*;
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
+## Struct diagram
+[ProcessAddressSpaceId]
+- [PacidCapability]
+- [PacidControl]
+
+## Examples
+
+```rust
+# use pcics::extended_capabilities::process_address_space_id::*;
+let data = [
+    0x1b, 0x00, 0x00, 0x00, 0x02, 0x04, 0x03, 0x00,
+];
+let result = data[4..].try_into().unwrap();
+let sample = ProcessAddressSpaceId {
+    pacid_capability: PacidCapability {
+        execute_permission_supported: true,
+        privileged_mode_supported: false,
+        max_pasid_width: 0x04,
+    },
+    pacid_control: PacidControl {
+        pasid_enable: true,
+        execute_permission_enable: true,
+        privileged_mode_enable: false,
+    },
 };
+assert_eq!(sample, result);
+```
+*/
+
+use heterob::{bit_numbering::Lsb, endianness::Le, Seq, P2, P4, P6};
+
+use super::ExtendedCapabilityDataError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessAddressSpaceId {
     pub pacid_capability: PacidCapability,
     pub pacid_control: PacidControl,
 }
-impl<'a> TryRead<'a, Endian> for ProcessAddressSpaceId {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let pacid = ProcessAddressSpaceId {
-            pacid_capability: bytes.read_with::<u16>(offset, endian)?.into(),
-            pacid_control: bytes.read_with::<u16>(offset, endian)?.into(),
-        };
-        Ok((pacid, *offset))
+impl TryFrom<&[u8]> for ProcessAddressSpaceId {
+    type Error = ExtendedCapabilityDataError;
+
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
+        let Seq {
+            head: Le((pacid_capability, pacid_control)),
+            ..
+        } = P2(slice)
+            .try_into()
+            .map_err(|_| ExtendedCapabilityDataError {
+                name: "Process Address Space ID",
+                size: 4,
+            })?;
+        Ok(Self {
+            pacid_capability: From::<u16>::from(pacid_capability),
+            pacid_control: From::<u16>::from(pacid_control),
+        })
     }
-}
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct PacidCapabilityProto {
-    rsvdp: B1,
-    execute_permission_supported: bool,
-    privileged_mode_supported: bool,
-    rsvdp_2: B5,
-    max_pasid_width: B5,
-    rsvdp_3: B3,
 }
 
 /// PASID Capability
@@ -51,30 +72,23 @@ pub struct PacidCapability {
     /// Max PASID Width
     pub max_pasid_width: u8,
 }
-impl From<PacidCapabilityProto> for PacidCapability {
-    fn from(proto: PacidCapabilityProto) -> Self {
-        let _ = proto.rsvdp();
-        let _ = proto.rsvdp_2();
-        let _ = proto.rsvdp_3();
+
+impl From<u16> for PacidCapability {
+    fn from(word: u16) -> Self {
+        let Lsb((
+            (),
+            execute_permission_supported,
+            privileged_mode_supported,
+            (),
+            max_pasid_width,
+            (),
+        )) = P6::<_, 1, 1, 1, 5, 5, 3>(word).into();
         Self {
-            execute_permission_supported: proto.execute_permission_supported(),
-            privileged_mode_supported: proto.privileged_mode_supported(),
-            max_pasid_width: proto.max_pasid_width(),
+            execute_permission_supported,
+            privileged_mode_supported,
+            max_pasid_width,
         }
     }
-}
-impl From<u16> for PacidCapability {
-    fn from(word: u16) -> Self { PacidCapabilityProto::from(word).into() }
-}
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct PacidControlProto {
-    pasid_enable: bool,
-    execute_permission_enable: bool,
-    privileged_mode_enable: bool,
-    rsvdp: B13,
 }
 
 /// PASID Control
@@ -87,17 +101,15 @@ pub struct PacidControl {
     /// Privileged Mode Enable
     pub privileged_mode_enable: bool,
 }
-impl From<PacidControlProto> for PacidControl {
-    fn from(proto: PacidControlProto) -> Self {
-        let _ = proto.rsvdp();
+
+impl From<u16> for PacidControl {
+    fn from(word: u16) -> Self {
+        let Lsb((pasid_enable, execute_permission_enable, privileged_mode_enable, ())) =
+            P4::<_, 1, 1, 1, 13>(word).into();
         Self {
-            pasid_enable: proto.pasid_enable(),
-            execute_permission_enable: proto.execute_permission_enable(),
-            privileged_mode_enable: proto.privileged_mode_enable(),
+            pasid_enable,
+            execute_permission_enable,
+            privileged_mode_enable,
         }
     }
 }
-impl From<u16> for PacidControl {
-    fn from(word: u16) -> Self { PacidControlProto::from(word).into() }
-}
-
