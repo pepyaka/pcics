@@ -130,6 +130,11 @@ pub enum ExtendedCapabilityError {
         offset: u16,
         source: advanced_error_reporting::AdvancedErrorReportingError,
     },
+    #[snafu(display("[{offset:03x}] Downstream Port Containment error: {source}"))]
+    DownstreamPortContainment{
+        offset: u16,
+        source: downstream_port_containment::DownstreamPortContainmentError,
+    },
 }
 impl From<byte::Error> for ExtendedCapabilityError {
     fn from(be: byte::Error) -> Self {
@@ -244,7 +249,8 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
             0x001B => ecap_data.try_into().map(Kind::ProcessAddressSpaceId)
                         .context(DataSnafu { offset })?,
             0x001C => Kind::LnRequester,
-            0x001D => Kind::DownstreamPortContainment(bytes.read_with(ecap_data_offset, LE)?),
+            0x001D => ecap_data.try_into().map(Kind::DownstreamPortContainment)
+                        .context(DownstreamPortContainmentSnafu { offset })?,
             0x001E => ecap_data.try_into().map(Kind::L1PmSubstates)
                         .context(DataSnafu { offset })?,
             0x001F => Kind::PrecisionTimeMeasurement(bytes.read_with(ecap_data_offset, LE)?),
