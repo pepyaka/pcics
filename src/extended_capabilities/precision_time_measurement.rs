@@ -1,17 +1,49 @@
-//! Precision Time Measurement (PTM)
-//!
-//! Precision Time Measurement (PTM) enables precise coordination of events across multiple
-//! components with independent local time clocks.
+/*!
+# Precision Time Measurement (PTM)
 
-use modular_bitfield::prelude::*;
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
+Precision Time Measurement (PTM) enables precise coordination of events across multiple
+components with independent local time clocks.
+
+## Struct diagram
+[PrecisionTimeMeasurement]
+- [PtmCapability]
+- [PtmControl]
+
+## Examples
+
+> ```text
+> PTMCap: Requester:- Responder:+ Root:+
+> PTMClockGranularity: 4ns
+> PTMControl: Enabled:- RootSelected:-
+> PTMEffectiveGranularity: Unknown
+> ```
+
+```rust
+# use pcics::extended_capabilities::precision_time_measurement::*;
+let data = [
+    0x1f, 0x00, 0x01, 0x22, 0x06, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+let sample = PrecisionTimeMeasurement {
+    ptm_capability: PtmCapability {
+        ptm_requester_capable: false,
+        ptm_responder_capable: true,
+        ptm_root_capable: true,
+        local_clock_granularity: 4,
+    },
+    ptm_control: PtmControl {
+        ptm_enable: false,
+        root_select: false,
+        effective_granularity: 0x00,
+    },
 };
+let result = data[4..].try_into().unwrap();
+assert_eq!(sample, result);
+```
+*/
 
+use heterob::{bit_numbering::Lsb, endianness::Le, Seq, P2, P5, P6};
+
+use super::ExtendedCapabilityDataError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrecisionTimeMeasurement {
@@ -20,36 +52,23 @@ pub struct PrecisionTimeMeasurement {
     /// PTM Control
     pub ptm_control: PtmControl,
 }
-impl<'a> TryRead<'a, Endian> for PrecisionTimeMeasurement {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let ptm = PrecisionTimeMeasurement {
-            ptm_capability: bytes.read_with::<u32>(offset, endian)?.into(),
-            ptm_control: bytes.read_with::<u32>(offset, endian)?.into(),
-        };
-        Ok((ptm, *offset))
-    }
-}
+impl TryFrom<&[u8]> for PrecisionTimeMeasurement {
+    type Error = ExtendedCapabilityDataError;
 
-#[bitfield(bits = 32)]
-#[repr(u32)]
-pub struct PtmCapabilityProto {
-    ptm_requester_capable: bool,
-    ptm_responder_capable: bool,
-    ptm_root_capable: bool,
-    rsvdp: B5,
-    local_clock_granularity: u8,
-    rsvdp_2: B16,
-}
-impl From<PtmCapability> for PtmCapabilityProto {
-    fn from(data: PtmCapability) -> Self {
-        Self::new()
-            .with_ptm_requester_capable(data.ptm_requester_capable)
-            .with_ptm_responder_capable(data.ptm_responder_capable)
-            .with_ptm_root_capable(data.ptm_root_capable)
-            .with_rsvdp(0)
-            .with_local_clock_granularity(data.local_clock_granularity)
-            .with_rsvdp_2(0)
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
+        let Seq {
+            head: Le((ptm_capability, ptm_control)),
+            ..
+        } = P2(slice)
+            .try_into()
+            .map_err(|_| ExtendedCapabilityDataError {
+                name: "Precision Time Measurement",
+                size: 8,
+            })?;
+        Ok(Self {
+            ptm_capability: From::<u32>::from(ptm_capability),
+            ptm_control: From::<u32>::from(ptm_control),
+        })
     }
 }
 
@@ -65,42 +84,23 @@ pub struct PtmCapability {
     /// Local Clock Granularity
     pub local_clock_granularity: u8,
 }
-impl From<PtmCapabilityProto> for PtmCapability {
-    fn from(proto: PtmCapabilityProto) -> Self {
-        let _ = proto.rsvdp();
-        let _ = proto.rsvdp_2();
-        Self {
-            ptm_requester_capable: proto.ptm_requester_capable(),
-            ptm_responder_capable: proto.ptm_responder_capable(),
-            ptm_root_capable: proto.ptm_root_capable(),
-            local_clock_granularity: proto.local_clock_granularity(),
-        }
-    }
-}
-impl From<u32> for PtmCapability {
-    fn from(dword: u32) -> Self { PtmCapabilityProto::from(dword).into() }
-}
-impl From<PtmCapability> for u32 {
-    fn from(data: PtmCapability) -> Self { PtmCapabilityProto::from(data).into() }
-}
 
-#[bitfield(bits = 32)]
-#[repr(u32)]
-pub struct PtmControlProto {
-    ptm_enable: bool,
-    root_select: bool,
-    rsvdp: B6,
-    effective_granularity: u8,
-    rsvdp_2: B16,
-}
-impl From<PtmControl> for PtmControlProto {
-    fn from(data: PtmControl) -> Self {
-        Self::new()
-            .with_ptm_enable(data.ptm_enable)
-            .with_root_select(data.root_select)
-            .with_rsvdp(0)
-            .with_effective_granularity(data.effective_granularity)
-            .with_rsvdp_2(0)
+impl From<u32> for PtmCapability {
+    fn from(dword: u32) -> Self {
+        let Lsb((
+            ptm_requester_capable,
+            ptm_responder_capable,
+            ptm_root_capable,
+            (),
+            local_clock_granularity,
+            (),
+        )) = P6::<_, 1, 1, 1, 5, 8, 16>(dword).into();
+        Self {
+            ptm_requester_capable,
+            ptm_responder_capable,
+            ptm_root_capable,
+            local_clock_granularity,
+        }
     }
 }
 
@@ -113,20 +113,15 @@ pub struct PtmControl {
     /// Effective Granularity
     pub effective_granularity: u8,
 }
-impl From<PtmControlProto> for PtmControl {
-    fn from(proto: PtmControlProto) -> Self {
-        let _ = proto.rsvdp();
-        let _ = proto.rsvdp_2();
+
+impl From<u32> for PtmControl {
+    fn from(dword: u32) -> Self {
+        let Lsb((ptm_enable, root_select, (), effective_granularity, ())) =
+            P5::<_, 1, 1, 6, 8, 16>(dword).into();
         Self {
-            ptm_enable: proto.ptm_enable(),
-            root_select: proto.root_select(),
-            effective_granularity: proto.effective_granularity(),
+            ptm_enable,
+            root_select,
+            effective_granularity,
         }
     }
-}
-impl From<u32> for PtmControl {
-    fn from(dword: u32) -> Self { PtmControlProto::from(dword).into() }
-}
-impl From<PtmControl> for u32 {
-    fn from(data: PtmControl) -> Self { PtmControlProto::from(data).into() }
 }

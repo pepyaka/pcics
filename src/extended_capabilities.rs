@@ -89,10 +89,6 @@ let sample = vec![
 
 
 
-use byte::{
-    ctx::*,
-    BytesExt,
-};
 use heterob::{P3, bit_numbering::LsbInto};
 use snafu::prelude::*;
 
@@ -200,7 +196,6 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
         *next_capability_offset = next_cap_offset;
 
         let ecap_data = &bytes[ecap_data_offset..];
-        let ecap_data_offset = &mut ecap_data_offset.clone(); // ecap u32 sized
 
         use ExtendedCapabilityKind as Kind;
         let kind = match id {
@@ -253,7 +248,8 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
                         .context(DownstreamPortContainmentSnafu { offset })?,
             0x001E => ecap_data.try_into().map(Kind::L1PmSubstates)
                         .context(DataSnafu { offset })?,
-            0x001F => Kind::PrecisionTimeMeasurement(bytes.read_with(ecap_data_offset, LE)?),
+            0x001F => ecap_data.try_into().map(Kind::PrecisionTimeMeasurement)
+                        .context(DataSnafu { offset })?,
             0x0020 => Kind::PciExpressOverMphy,
             0x0021 => Kind::FrsQueueing,
             0x0022 => Kind::ReadinessTimeReporting,
