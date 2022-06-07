@@ -1,10 +1,4 @@
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
-};
+use heterob::{endianness::Le, P3};
 
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -18,15 +12,14 @@ pub struct ClassCode {
     pub base: u8,
 }
 
-impl<'a> TryRead<'a, Endian> for ClassCode {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let class_code = ClassCode {
-            interface: bytes.read_with::<u8>(offset, endian)?,
-            sub: bytes.read_with::<u8>(offset, endian)?,
-            base: bytes.read_with::<u8>(offset, endian)?,
-        };
-        Ok((class_code, *offset))
+impl From<[u8; 3]> for ClassCode {
+    fn from(bytes: [u8; 3]) -> Self {
+        let Le((interface, sub, base)) = P3(bytes).into();
+        Self {
+            interface,
+            sub,
+            base,
+        }
     }
 }
 
@@ -249,7 +242,7 @@ mod tests {
     #[test]
     fn meaning() {
         let data = [0x00, 0x00, 0x05];
-        let result = data.read_with::<ClassCode>(&mut 0, LE).unwrap();
+        let result: ClassCode = data.try_into().unwrap();
         let result = result.meaning();
         assert_eq!(("Memory controller", Some("RAM memory"), None), result);
     }

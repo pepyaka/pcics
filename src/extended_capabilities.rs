@@ -107,8 +107,6 @@ pub enum ExtendedCapabilityError {
     Header { offset: u16 },
     #[snafu(display("[{offset:03x}] extended capability has empty header"))]
     EmptyHeader { offset: u16 },
-    #[snafu(display("`byte` crate error"))]
-    ByteCrate { err: byte::Error },
     #[snafu(display("[{offset:03x}] {source} data read error"))]
     Data { offset: u16, source: ExtendedCapabilityDataError },
     #[snafu(display("[{offset:03x}] Root Complex Link Declaration error: {source}"))]
@@ -132,11 +130,7 @@ pub enum ExtendedCapabilityError {
         source: downstream_port_containment::DownstreamPortContainmentError,
     },
 }
-impl From<byte::Error> for ExtendedCapabilityError {
-    fn from(be: byte::Error) -> Self {
-        Self::ByteCrate { err: be }
-    }
-}
+
 
 /// Common error for reading capability data
 #[derive(Snafu, Debug, Clone, Copy, PartialEq, Eq)]

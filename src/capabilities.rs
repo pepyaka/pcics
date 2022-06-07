@@ -236,8 +236,6 @@ pub enum CapabilityError {
     Pointer,
     #[snafu(display("[{ptr:02x}] capability header is not available"))]
     Header { ptr: u8 },
-    #[snafu(display("`byte` crate error {err:?}"))]
-    ByteCrate { err: byte::Error },
     #[snafu(display("[{ptr:02x}] {source} data read error"))]
     Data {
         ptr: u8,
@@ -264,11 +262,7 @@ pub enum CapabilityError {
         source: message_signaled_interrups::MessageSignaledInterrupsError,
     },
 }
-impl From<byte::Error> for CapabilityError {
-    fn from(be: byte::Error) -> Self {
-        Self::ByteCrate { err: be }
-    }
-}
+
 
 /// Common error for reading capability data
 #[derive(Snafu, Debug, Clone, Copy, PartialEq, Eq)]

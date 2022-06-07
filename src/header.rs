@@ -79,20 +79,14 @@ assert_eq!(sample, result);
 ```
 */
 
-use core::convert::TryInto;
 
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
-};
+use core::array::TryFromSliceError;
 
 mod command;
 pub use command::Command;
 
 mod status;
+use heterob::{endianness::Le, P11, P22, P17, Seq, P4};
 pub use status::{Status, DevselTiming};
 
 mod class_code;
@@ -148,118 +142,17 @@ pub struct Header {
     pub interrupt_line: u8,
     pub interrupt_pin: InterruptPin,
 }
-impl<'a> TryRead<'a, Endian> for Header {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let vendor_id = bytes.read_with::<u16>(offset, endian)?;
-        let device_id = bytes.read_with::<u16>(offset, endian)?;
-        let command = bytes.read_with::<u16>(offset, endian)?.into();
-        let status = bytes.read_with::<u16>(offset, endian)?.into();
-        let revision_id = bytes.read_with::<u8>(offset, endian)?;
-        let class_code = bytes.read_with::<ClassCode>(offset, endian)?;
-        let cache_line_size = bytes.read_with::<u8>(offset, endian)?;
-        let latency_timer = bytes.read_with::<u8>(offset, endian)?;
-        let htype = bytes.read_with::<u8>(offset, endian)?;
-        let bist = bytes.read_with::<BuiltInSelfTest>(offset, endian)?;
-        let (capabilities_pointer, interrupt_line, interrupt_pin);
-        let is_multi_function = htype & 0x80 != 0;
-        let header_type = match htype & !0x80 {
-            0x00 => {
-                HeaderType::Normal(Normal {
-                    base_addresses: bytes.read_with::<BaseAddressesNormal>(offset, endian)?,
-                    cardbus_cis_pointer: bytes.read_with::<u32>(offset, endian)?,
-                    sub_vendor_id: bytes.read_with::<u16>(offset, endian)?,
-                    sub_device_id: bytes.read_with::<u16>(offset, endian)?,
-                    expansion_rom: bytes.read_with::<ExpansionRom>(offset, endian)?,
-                    min_grant: {
-                        capabilities_pointer = bytes.read_with::<u8>(offset, endian)? & !0b11;
-                        let _reserved: [u8; 7] = bytes.read_with::<&[u8]>(offset, Bytes::Len(7))?
-                            .try_into().unwrap_or_default();
-                        interrupt_line = bytes.read_with::<u8>(offset, endian)?;
-                        interrupt_pin = bytes.read_with::<InterruptPin>(offset, endian)?;
-                        bytes.read_with::<u8>(offset, endian)?
-                    },
-                    max_latency: bytes.read_with::<u8>(offset, endian)?,
-                })
-            },
-            0x01 => {
-                let io_base = bytes.read_with::<u8>(&mut 0x1C, endian)?;
-                let io_limit = bytes.read_with::<u8>(&mut 0x1D, endian)?;
-                HeaderType::Bridge(Bridge {
-                    base_addresses: bytes.read_with::<BaseAddressesBridge>(offset, endian)?,
-                    primary_bus_number: bytes.read_with::<u8>(offset, endian)?,
-                    secondary_bus_number: bytes.read_with::<u8>(offset, endian)?,
-                    subordinate_bus_number: bytes.read_with::<u8>(offset, endian)?,
-                    secondary_latency_timer: bytes.read_with::<u8>(offset, endian)?,
-                    secondary_status: {
-                        *offset += 2; // Skip IO Base and IO Limit
-                        bytes.read_with::<u16>(offset, endian)?.into()
-                    },
-                    memory_base: bytes.read_with::<u16>(offset, endian)?,
-                    memory_limit: bytes.read_with::<u16>(offset, endian)?,
-                    prefetchable_memory: BridgePrefetchableMemory::new(
-                        bytes.read_with::<u16>(offset, endian)?, // Prefetchable Memory Base
-                        bytes.read_with::<u16>(offset, endian)?, // Prefetchable Memory Limit
-                        bytes.read_with::<u32>(offset, endian)?, // Prefetchable Base Upper 32 Bits
-                        bytes.read_with::<u32>(offset, endian)?, // Prefetchable Limit Upper 32 Bits
-                    ),
-                    io_address_range: BridgeIoAddressRange::new(
-                        io_base, io_limit,
-                        bytes.read_with::<u16>(offset, endian)?, // I/O Base Upper 16 Bits
-                        bytes.read_with::<u16>(offset, endian)?, // I/O Limit Upper 16 Bits
-                    ),
-                    expansion_rom: {
-                        capabilities_pointer = bytes.read_with::<u8>(offset, endian)? & !0b11;
-                        let _reserved: [u8; 3] = bytes.read_with::<&[u8]>(offset, Bytes::Len(3))?
-                            .try_into().unwrap_or_default();
-                        bytes.read_with::<ExpansionRom>(offset, endian)?
-                    },
-                    bridge_control: {
-                        interrupt_line = bytes.read_with::<u8>(offset, endian)?;
-                        interrupt_pin = bytes.read_with::<InterruptPin>(offset, endian)?;
-                        bytes.read_with::<u16>(offset, endian)?.into()
-                    },
-                })
-            },
-            0x02 => {
-                HeaderType::Cardbus(Cardbus {
-                    base_addresses: bytes.read_with::<BaseAddressesCardbus>(offset, endian)?,
-                    secondary_status: {
-                        // PCI-TO-CARDBUS BRIDGE capabilities_pointer at 0x14
-                        capabilities_pointer = bytes.read_with::<u8>(offset, endian)? & !0b11;
-                        let _reserved = bytes.read_with::<u8>(offset, endian)?;
-                        bytes.read_with::<u16>(offset, endian)?.into()
-                    },
-                    pci_bus_number: bytes.read_with::<u8>(offset, endian)?,
-                    cardbus_bus_number: bytes.read_with::<u8>(offset, endian)?,
-                    subordinate_bus_number: bytes.read_with::<u8>(offset, endian)?,
-                    cardbus_latency_timer: bytes.read_with::<u8>(offset, endian)?,
-                    memory_base_address_0: bytes.read_with::<u32>(offset, endian)?,
-                    memory_limit_address_0: bytes.read_with::<u32>(offset, endian)?,
-                    memory_base_address_1: bytes.read_with::<u32>(offset, endian)?,
-                    memory_limit_address_1: bytes.read_with::<u32>(offset, endian)?,
-                    io_access_address_range_0: bytes.read_with::<IoAccessAddressRange>(offset, endian)?,
-                    io_access_address_range_1: bytes.read_with::<IoAccessAddressRange>(offset, endian)?,
-                    bridge_control: {
-                        interrupt_line = bytes.read_with::<u8>(offset, endian)?;
-                        interrupt_pin = bytes.read_with::<InterruptPin>(offset, endian)?;
-                        bytes.read_with::<u16>(offset, endian)?.into()
-                    },
-                    subsystem_vendor_id: bytes.read_with::<u16>(offset, endian).ok(),
-                    subsystem_device_id: bytes.read_with::<u16>(offset, endian).ok(),
-                    legacy_mode_base_address: bytes.read_with::<u32>(offset, endian).ok(),
-                    reserved: bytes.read_with::<&[u8]>(offset, Bytes::Len(Cardbus::RESERVED_SIZE)).ok()
-                        .and_then(|slice| <[u8;Cardbus::RESERVED_SIZE]>::try_from(slice).ok()),
-                })
-            },
-            v => {
-                capabilities_pointer = bytes.read_with::<u8>(&mut 0x34, endian)? & !0b11;
-                interrupt_line = bytes.read_with::<u8>(&mut 0x3c, endian)?;
-                interrupt_pin = bytes.read_with::<InterruptPin>(&mut 0x3d, endian)?;
-                HeaderType::Reserved(v)
-            },
-        };
-        let header = Header {
+
+impl Header {
+    /// Predefined header region is 64 bytes long
+    pub const TOTAL_SIZE: usize = 0x40;
+    /// The first 16 bytes are defined the same for all types of devices
+    pub const COMMON_SIZE: usize = 0x10;
+}
+
+impl From<[u8; Header::TOTAL_SIZE]> for Header {
+    fn from(bytes: [u8; Header::TOTAL_SIZE]) -> Self {
+        let Le((
             vendor_id,
             device_id,
             command,
@@ -268,23 +161,187 @@ impl<'a> TryRead<'a, Endian> for Header {
             class_code,
             cache_line_size,
             latency_timer,
-            is_multi_function,
-            header_type,
+            htype,
             bist,
-            capabilities_pointer,
+            tail,
+        )) = P11(bytes).into();
+        let _: u8 = htype;
+        let _: [u8; Header::TOTAL_SIZE - Header::COMMON_SIZE] = tail;
+        let (capabilities_pointer, interrupt_line, interrupt_pin, header_type): (u8, u8, u8, _) =
+            match htype & !0x80 {
+                0x00 => {
+                    let Le((
+                        base_addresses,
+                        cardbus_cis_pointer,
+                        sub_vendor_id,
+                        sub_device_id,
+                        expansion_rom,
+                        capabilities_pointer,
+                        _reserved,
+                        interrupt_line,
+                        interrupt_pin,
+                        min_grant,
+                        max_latency,
+                    )) = P11(tail).into();
+                    let _: [u8; 7] = _reserved;
+                    (
+                        capabilities_pointer,
+                        interrupt_line,
+                        interrupt_pin,
+                        HeaderType::Normal(Normal {
+                            base_addresses: From::<[u8; 6 * 4]>::from(base_addresses),
+                            cardbus_cis_pointer,
+                            sub_vendor_id,
+                            sub_device_id,
+                            expansion_rom: From::<u32>::from(expansion_rom),
+                            min_grant,
+                            max_latency,
+                        }),
+                    )
+                }
+                0x01 => {
+                    let Le((
+                        base_addresses,
+                        primary_bus_number,
+                        secondary_bus_number,
+                        subordinate_bus_number,
+                        secondary_latency_timer,
+                        io_base,
+                        io_limit,
+                        secondary_status,
+                        memory_base,
+                        memory_limit,
+                        base,
+                        limit,
+                        base_upper_32,
+                        limit_upper_32,
+                        io_base_upper,
+                        io_limit_upper,
+                        capabilities_pointer,
+                        _reserved,
+                        expansion_rom,
+                        interrupt_line,
+                        interrupt_pin,
+                        bridge_control,
+                    )) = P22(tail).into();
+                    let _: [u8; 3] = _reserved;
+                    (
+                        capabilities_pointer,
+                        interrupt_line,
+                        interrupt_pin,
+                        HeaderType::Bridge(Bridge {
+                            base_addresses: From::<[u8; 2 * 4]>::from(base_addresses),
+                            primary_bus_number,
+                            secondary_bus_number,
+                            subordinate_bus_number,
+                            secondary_latency_timer,
+                            io_address_range: BridgeIoAddressRange::new(
+                                io_base,
+                                io_limit,
+                                io_base_upper,
+                                io_limit_upper,
+                            ),
+                            secondary_status: From::<u16>::from(secondary_status),
+                            memory_base,
+                            memory_limit,
+                            prefetchable_memory: BridgePrefetchableMemory::new(
+                                base,
+                                limit,
+                                base_upper_32,
+                                limit_upper_32,
+                            ),
+                            expansion_rom: From::<u32>::from(expansion_rom),
+                            bridge_control: From::<u16>::from(bridge_control),
+                        }),
+                    )
+                }
+                0x02 => {
+                    let Le((
+                        base_addresses,
+                        capabilities_pointer,
+                        _reserved,
+                        secondary_status,
+                        pci_bus_number,
+                        cardbus_bus_number,
+                        subordinate_bus_number,
+                        cardbus_latency_timer,
+                        memory_base_address_0,
+                        memory_limit_address_0,
+                        memory_base_address_1,
+                        memory_limit_address_1,
+                        io_access_address_range_0,
+                        io_access_address_range_1,
+                        interrupt_line,
+                        interrupt_pin,
+                        bridge_control,
+                    )) = P17(tail).into();
+                    let _: u8 = _reserved;
+                    let Le(io_access_address_range_0) =
+                        From::<[u8; 8]>::from(io_access_address_range_0);
+                    let Le(io_access_address_range_1) =
+                        From::<[u8; 8]>::from(io_access_address_range_1);
+                    (
+                        capabilities_pointer,
+                        interrupt_line,
+                        interrupt_pin,
+                        HeaderType::Cardbus(Cardbus {
+                            base_addresses: From::<[u8; 1 * 4]>::from(base_addresses),
+                            secondary_status: From::<u16>::from(secondary_status),
+                            pci_bus_number,
+                            cardbus_bus_number,
+                            subordinate_bus_number,
+                            cardbus_latency_timer,
+                            memory_base_address_0,
+                            memory_limit_address_0,
+                            memory_base_address_1,
+                            memory_limit_address_1,
+                            io_access_address_range_0: From::<[u16; 4]>::from(
+                                io_access_address_range_0,
+                            ),
+                            io_access_address_range_1: From::<[u16; 4]>::from(
+                                io_access_address_range_1,
+                            ),
+                            bridge_control: From::<u16>::from(bridge_control),
+                    subsystem_vendor_id: None,
+                    subsystem_device_id: None,
+                    legacy_mode_base_address: None,
+                    reserved: None,
+                        }),
+                    )
+                }
+                _ => todo!(),
+            };
+        Self {
+            vendor_id,
+            device_id,
+            command: From::<u16>::from(command),
+            status: From::<u16>::from(status),
+            revision_id,
+            class_code: From::<[u8; 3]>::from(class_code),
+            cache_line_size,
+            latency_timer,
+            is_multi_function: htype & 0x80 != 0,
+            header_type,
+            bist: From::<u8>::from(bist),
+            capabilities_pointer: capabilities_pointer & !0b11u8,
             interrupt_line,
-            interrupt_pin,
-        };
-        Ok((header, *offset))
+            interrupt_pin: interrupt_pin.into(),
+        }
     }
 }
-impl<'a> TryFrom<&'a [u8]> for Header {
-    type Error = byte::Error;
 
-    fn try_from(bytes: &'a [u8]) -> Result<Self, Self::Error> {
-        bytes.read_with(&mut 0, LE)
+impl TryFrom<&[u8]> for Header {
+    type Error = TryFromSliceError;
+
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
+        slice
+            .try_into()
+            .map(|seq: Seq<[u8; Header::TOTAL_SIZE], _>| seq.head.into())
     }
 }
+
+
+
 
 
 
@@ -513,7 +570,21 @@ pub struct Cardbus {
 }
 impl Cardbus {
     const RESERVED_SIZE: usize = 0x80 - 0x48;
+    pub fn try_set_optional_registers(&mut self, slice: &[u8]) -> Result<(), TryFromSliceError> {
+        let Seq { head: Le((
+            subsystem_vendor_id,
+            subsystem_device_id,
+            legacy_mode_base_address,
+            reserved,
+        )), .. } = P4(slice).try_into()?;
+        self.subsystem_vendor_id = Some(subsystem_vendor_id);
+        self.subsystem_device_id = Some(subsystem_device_id);
+        self.legacy_mode_base_address = Some(legacy_mode_base_address);
+        self.reserved = Some(reserved);
+        Ok(())
+    }
 }
+
 
 
 /// Represents that status and allows control of a devices BIST (built-in self test).
@@ -548,18 +619,6 @@ impl From<BuiltInSelfTest> for u8 {
         result
     }
 }
-impl<'a> TryRead<'a, Endian> for BuiltInSelfTest {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let byte = bytes.read_with::<u8>(offset, endian)?;
-        let bist = BuiltInSelfTest {
-            is_capable: byte & 0b1000_0000 != 0,
-            is_running: byte & 0b0100_0000 != 0,
-            completion_code: byte & 0b1111,
-        };
-        Ok((bist, *offset))
-    }
-}
 
 
 /// Specifies which interrupt pin the device uses.
@@ -575,21 +634,7 @@ pub enum InterruptPin {
 impl Default for InterruptPin {
     fn default() -> Self { Self::Unused }
 }
-impl<'a> TryRead<'a, Endian> for InterruptPin {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let byte = bytes.read_with::<u8>(offset, endian)?;
-        let interrupt_pin = match byte {
-            0x00 => Self::Unused,
-            0x01 => Self::IntA,
-            0x02 => Self::IntB,
-            0x03 => Self::IntC,
-            0x04 => Self::IntD,
-            v => Self::Reserved(v),
-        };
-        Ok((interrupt_pin, *offset))
-    }
-}
+
 impl From<u8> for InterruptPin {
     fn from(data: u8) -> Self {
         match data {
@@ -642,18 +687,7 @@ impl IoAccessAddressRange {
 impl Default for IoAccessAddressRange {
     fn default() -> Self { IoAccessAddressRange::Addr16Bit { base: 0, limit: 0 } }
 }
-impl<'a> TryRead<'a, Endian> for IoAccessAddressRange {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let base_lower = bytes.read_with::<u16>(offset, endian)?;
-        let base_upper = bytes.read_with::<u16>(offset, endian)?;
-        let limit_lower = bytes.read_with::<u16>(offset, endian)?;
-        let limit_upper = bytes.read_with::<u16>(offset, endian)?;
-        let io_access_address_range =
-            [[base_lower, base_upper], [limit_lower, limit_upper]].into();
-        Ok((io_access_address_range, *offset))
-    }
-}
+
 impl From<[[u16;2]; 2]> for IoAccessAddressRange {
     fn from(data: [[u16;2]; 2]) -> Self {
         let [[base_lower, base_upper], [limit_lower, limit_upper]] = data;
@@ -679,6 +713,11 @@ impl From<[[u16;2]; 2]> for IoAccessAddressRange {
         }
     }
 }
+impl From<[u16; 4]> for IoAccessAddressRange {
+    fn from([a,b,c,d]: [u16; 4]) -> Self {
+        [[a,b],[c,d]].into()
+}
+    }
 impl From<IoAccessAddressRange > for [[u16;2]; 2] {
     fn from(data: IoAccessAddressRange) -> Self {
         match data {
@@ -705,17 +744,7 @@ pub struct ExpansionRom {
     pub address: u32,
     pub is_enabled: bool,
 }
-impl<'a> TryRead<'a, Endian> for ExpansionRom {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let dword = bytes.read_with::<u32>(offset, endian)?;
-        let expansion_rom = ExpansionRom {
-            address: dword & !0x7ff,
-            is_enabled: dword & 1 != 0,
-        };
-        Ok((expansion_rom, *offset))
-    }
-}
+
 impl From<u32> for ExpansionRom {
     fn from(dword: u32) -> Self {
         Self {
@@ -734,7 +763,6 @@ impl From<ExpansionRom> for u32 {
 
 #[cfg(test)]
 mod tests {
-    use byte::*;
     use pretty_assertions::assert_eq;
     use super::*;
 
@@ -799,7 +827,7 @@ mod tests {
             0x21, 0x30, 0x00, 0x00, 0x00, 0x60, 0x01, 0x93, 0x00, 0x00, 0x00, 0x00, 0x28, 0x10, 0xa5, 0x06,
             0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b, 0x01, 0x00, 0x00,
         ];
-        let result: Header = data.read_with(&mut 0, LE).unwrap();
+        let result: Header = data.try_into().unwrap();
         let sample = Header {
             vendor_id: 0x8086,
             device_id: 0xa102,
@@ -895,7 +923,7 @@ mod tests {
             0x00, 0x92, 0x90, 0x92, 0x01, 0x91, 0xf1, 0x91, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x00, 0x1b, 0x00,
         ];
-        let result: Header = data.read_with(&mut 0, LE).unwrap();
+        let result: Header = data.try_into().unwrap();
         // println!("{:#04X?}", &result);
         let sample = Header {
             vendor_id: 0x1912,
@@ -962,13 +990,22 @@ mod tests {
         // BridgeCtl: Parity+ SERR- ISA+ VGA- MAbort- >Reset+ 16bInt- PostWrite+
         // 16-bit legacy interface ports at 3322
         let data = [
+            // Header
             0x8e, 0xdf, 0xee, 0x05, 0xb4, 0x00, 0x78, 0x4b, 0x37, 0x00, 0x07, 0x06, 0xf2, 0x29, 0x82, 0x00,
             0x00, 0x80, 0xf8, 0x35, 0x80, 0x00, 0x00, 0x00, 0x6d, 0xba, 0xfe, 0xfc, 0x00, 0x40, 0xf5, 0x11,
             0x00, 0x50, 0x47, 0x22, 0x00, 0x30, 0x85, 0x33, 0x00, 0xc0, 0xd0, 0x44, 0x60, 0x00, 0x00, 0x00,
             0x70, 0x00, 0x00, 0x00, 0x61, 0x00, 0x06, 0x00, 0x70, 0x00, 0x07, 0x00, 0x06, 0x1a, 0x45, 0x05,
-            0x22, 0x33, 0x44, 0x55, 0x22, 0x33, 0x00, 0x00,
+            // Device dependent region
+            // (Subsystem ID, Subsystem Vendor ID,  PC Card 16 Bit IF Legacy Mode Base Address, reserved)
+            0x22, 0x33, 0x44, 0x55, 0x22, 0x33, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
-        let result: Header = data.read_with(&mut 0, LE).unwrap();
+        let mut result: Header = data.as_slice().try_into().unwrap();
+        if let HeaderType::Cardbus(ref mut cardbus) = result.header_type {
+            cardbus.try_set_optional_registers(&data[crate::DDR_OFFSET..]).unwrap();
+        }
         println!("{:02X?}", &data);
         let sample = Header {
             vendor_id: 0xdf8e,
@@ -1010,7 +1047,7 @@ mod tests {
                 subsystem_vendor_id: Some(0x3322),
                 subsystem_device_id: Some(0x5544),
                 legacy_mode_base_address: Some(0x3322),
-                reserved: None,
+                reserved: Some([0; 0x80 - 0x48]),
             }),
             bist: BuiltInSelfTest {
                 is_capable: false,

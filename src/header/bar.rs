@@ -5,29 +5,14 @@
 //! while I/O space BARs can reside at any memory address (even beyond physical memory). To
 //! distinguish between them, you can check the value of the lowest bit.
 
-use byte::{
-    ctx::*,
-    self,
-    TryRead,
-    // TryWrite,
-    BytesExt,
-};
+use heterob::endianness::LeBytesInto;
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseAddressesNormal(pub [u32; 6]);
-impl<'a> TryRead<'a, Endian> for BaseAddressesNormal {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let bar = [
-            bytes.read_with::<u32>(offset, endian)?,
-            bytes.read_with::<u32>(offset, endian)?,
-            bytes.read_with::<u32>(offset, endian)?,
-            bytes.read_with::<u32>(offset, endian)?,
-            bytes.read_with::<u32>(offset, endian)?,
-            bytes.read_with::<u32>(offset, endian)?,
-        ];
-        Ok((Self(bar), *offset))
+impl From<[u8; 6 * 4]> for BaseAddressesNormal {
+    fn from(bytes: [u8; 6 * 4]) -> Self {
+        Self(bytes.le_bytes_into())
     }
 }
 impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesNormal {
@@ -59,14 +44,9 @@ impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesNormal {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseAddressesBridge(pub [u32; 2]);
-impl<'a> TryRead<'a, Endian> for BaseAddressesBridge {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let bar = [
-            bytes.read_with::<u32>(offset, endian)?,
-            bytes.read_with::<u32>(offset, endian)?,
-        ];
-        Ok((Self(bar), *offset))
+impl From<[u8; 2 * 4]> for BaseAddressesBridge {
+    fn from(bytes: [u8; 2 * 4]) -> Self {
+        Self(bytes.le_bytes_into())
     }
 }
 impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesBridge {
@@ -98,13 +78,9 @@ impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesBridge {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseAddressesCardbus(pub [u32; 1]);
-impl<'a> TryRead<'a, Endian> for BaseAddressesCardbus {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let bar = [
-            bytes.read_with::<u32>(offset, endian)?,
-        ];
-        Ok((Self(bar), *offset))
+impl From<[u8; 1 * 4]> for BaseAddressesCardbus {
+    fn from(bytes: [u8; 1 * 4]) -> Self {
+        Self(bytes.le_bytes_into())
     }
 }
 impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesCardbus {
