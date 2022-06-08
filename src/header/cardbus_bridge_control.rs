@@ -1,8 +1,7 @@
 //! The Bridge Control register provides extensions of the Command Register that are specific to
 //! PCI to PCI and PCI-to-CardBus bridges.
 
-use modular_bitfield::prelude::*;
-
+use heterob::{bit_numbering::Lsb, P12};
 
 /// Bridge Control Register (Offset = 3EH)
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -33,51 +32,41 @@ pub struct CardbusBridgeControl {
     pub write_posting_enable: bool,
 }
 
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct CardbusBridgeControlProto {
-    parity_error_response_enable: bool,
-    serr_enable: bool,
-    isa_enable: bool,
-    vga_enable: bool,
-    pub reserved0: B1,
-    master_abort_mode: bool,
-    cardbus_reset: bool,
-    ireq_int_enable: bool,
-    memory_0_prefetch_enable: bool,
-    memory_1_prefetch_enable: bool,
-    write_posting_enable: bool,
-    pub reserved1: B5,
-}
-
-
-
-impl From<CardbusBridgeControlProto> for CardbusBridgeControl {
-    fn from(proto: CardbusBridgeControlProto) -> Self {
+impl From<u16> for CardbusBridgeControl {
+    fn from(word: u16) -> Self {
+        let Lsb((
+            parity_error_response_enable,
+            serr_enable,
+            isa_enable,
+            vga_enable,
+            (),
+            master_abort_mode,
+            cardbus_reset,
+            ireq_int_enable,
+            memory_0_prefetch_enable,
+            memory_1_prefetch_enable,
+            write_posting_enable,
+            (),
+        )) = P12::<_, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 5>(word).into();
         Self {
-            parity_error_response_enable: proto.parity_error_response_enable(),
-            serr_enable: proto.serr_enable(),
-            isa_enable: proto.isa_enable(),
-            vga_enable: proto.vga_enable(),
-            master_abort_mode: proto.master_abort_mode(),
-            cardbus_reset: proto.cardbus_reset(),
-            ireq_int_enable: proto.ireq_int_enable(),
-            memory_0_prefetch_enable: proto.memory_0_prefetch_enable(),
-            memory_1_prefetch_enable: proto.memory_1_prefetch_enable(),
-            write_posting_enable: proto.write_posting_enable(),
+            parity_error_response_enable,
+            serr_enable,
+            isa_enable,
+            vga_enable,
+            master_abort_mode,
+            cardbus_reset,
+            ireq_int_enable,
+            memory_0_prefetch_enable,
+            memory_1_prefetch_enable,
+            write_posting_enable,
         }
     }
 }
-impl From<u16> for CardbusBridgeControl {
-    fn from(word: u16) -> Self { CardbusBridgeControlProto::from(word).into() }
-}
-
-
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn from_word() {

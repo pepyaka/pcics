@@ -1,29 +1,10 @@
-use modular_bitfield::prelude::*;
 use displaydoc::Display as DisplayDoc;
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct StatusProto {
-    reserved: B3,
-    interrupt_status: bool,
-    capabilities_list: bool,
-    is_66mhz_capable: bool,
-    user_definable_features: bool,
-    fast_back_to_back_capable: bool,
-    master_data_parity_error: bool,
-    devsel_timing: DevselTiming,
-    signaled_target_abort: bool,
-    received_target_abort: bool,
-    received_master_abort: bool,
-    system_error: bool,
-    detected_parity_error: bool,
-}
+use heterob::{bit_numbering::Lsb, P13};
 
 /// The Status register is used to record status information for PCI bus related events.
 ///
 /// Devices may not need to implement all bits, depending on device functionality. Reserved bits
-/// should be read-only and return zero when read. 
+/// should be read-only and return zero when read.
 /// There are three types of Status Register:
 /// 1. Primary (identical for all device types)
 /// 2. Secondary PCI-to-PCI Bridge
@@ -49,31 +30,43 @@ pub struct Status<const T: char> {
     pub system_error: bool,
     pub detected_parity_error: bool,
 }
-impl<const T: char> From<StatusProto> for Status<T> {
-    fn from(proto: StatusProto) -> Self {
+
+impl<const T: char> From<u16> for Status<T> {
+    fn from(word: u16) -> Self {
+        let Lsb((
+            reserved,
+            interrupt_status,
+            capabilities_list,
+            is_66mhz_capable,
+            user_definable_features,
+            fast_back_to_back_capable,
+            master_data_parity_error,
+            devsel_timing,
+            signaled_target_abort,
+            received_target_abort,
+            received_master_abort,
+            system_error,
+            detected_parity_error,
+        )) = P13::<_, 3, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1>(word).into();
         Self {
-            reserved: proto.reserved(),
-            interrupt_status: proto.interrupt_status(),
-            capabilities_list: proto.capabilities_list(),
-            is_66mhz_capable: proto.is_66mhz_capable(),
-            user_definable_features: proto.user_definable_features(),
-            fast_back_to_back_capable: proto.fast_back_to_back_capable(),
-            master_data_parity_error: proto.master_data_parity_error(),
-            devsel_timing: proto.devsel_timing(),
-            signaled_target_abort: proto.signaled_target_abort(),
-            received_target_abort: proto.received_target_abort(),
-            received_master_abort: proto.received_master_abort(),
-            system_error: proto.system_error(),
-            detected_parity_error: proto.detected_parity_error(),
+            reserved,
+            interrupt_status,
+            capabilities_list,
+            is_66mhz_capable,
+            user_definable_features,
+            fast_back_to_back_capable,
+            master_data_parity_error,
+            devsel_timing: From::<u8>::from(devsel_timing),
+            signaled_target_abort,
+            received_target_abort,
+            received_master_abort,
+            system_error,
+            detected_parity_error,
         }
     }
 }
-impl<const T: char> From<u16> for Status<T> {
-    fn from(word: u16) -> Self { StatusProto::from(word).into() }
-}
 
-#[derive(DisplayDoc, BitfieldSpecifier, Debug, Clone, Copy, PartialEq, Eq)]
-#[bits = 2]
+#[derive(DisplayDoc, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DevselTiming {
     /// fast
     Fast,
@@ -84,13 +77,22 @@ pub enum DevselTiming {
     /// undefined
     Undefined,
 }
-
-
+impl From<u8> for DevselTiming {
+    fn from(byte: u8) -> Self {
+        match byte {
+            0b00 => Self::Fast,
+            0b01 => Self::Medium,
+            0b10 => Self::Slow,
+            0b11 => Self::Undefined,
+            _ => unreachable!(),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn from_word() {

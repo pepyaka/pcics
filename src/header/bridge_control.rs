@@ -5,8 +5,7 @@
 //! interface that are provided by the Command register for the primary interface. There are some
 //! bits that affect the operation of both interfaces of the bridge.
 
-use modular_bitfield::prelude::*;
-
+use heterob::{bit_numbering::Lsb, P13};
 
 /// Bridge Control Register
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -44,54 +43,44 @@ pub struct BridgeControl {
     pub discard_timer_serr_enable: bool,
 }
 
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct BridgeControlProto {
-    parity_error_response_enable: bool,
-    serr_enable: bool,
-    isa_enable: bool,
-    vga_enable: bool,
-    vga_16_enable: bool,
-    master_abort_mode: bool,
-    secondary_bus_reset: bool,
-    fast_back_to_back_enable: bool,
-    primary_discard_timer: bool,
-    secondary_discard_timer: bool,
-    discard_timer_status: bool,
-    discard_timer_serr_enable: bool,
-    pub reserved: B4,
-}
-
-
-
-impl From<BridgeControlProto> for BridgeControl {
-    fn from(proto: BridgeControlProto) -> Self {
+impl From<u16> for BridgeControl {
+    fn from(word: u16) -> Self {
+        let Lsb((
+            parity_error_response_enable,
+            serr_enable,
+            isa_enable,
+            vga_enable,
+            vga_16_enable,
+            master_abort_mode,
+            secondary_bus_reset,
+            fast_back_to_back_enable,
+            primary_discard_timer,
+            secondary_discard_timer,
+            discard_timer_status,
+            discard_timer_serr_enable,
+            (),
+        )) = P13::<_, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4>(word).into();
         Self {
-            parity_error_response_enable: proto.parity_error_response_enable(),
-            serr_enable: proto.serr_enable(),
-            isa_enable: proto.isa_enable(),
-            vga_enable: proto.vga_enable(),
-            vga_16_enable: proto.vga_16_enable(),
-            master_abort_mode: proto.master_abort_mode(),
-            secondary_bus_reset: proto.secondary_bus_reset(),
-            fast_back_to_back_enable: proto.fast_back_to_back_enable(),
-            primary_discard_timer: proto.primary_discard_timer(),
-            secondary_discard_timer: proto.secondary_discard_timer(),
-            discard_timer_status: proto.discard_timer_status(),
-            discard_timer_serr_enable: proto.discard_timer_serr_enable(),
+            parity_error_response_enable,
+            serr_enable,
+            isa_enable,
+            vga_enable,
+            vga_16_enable,
+            master_abort_mode,
+            secondary_bus_reset,
+            fast_back_to_back_enable,
+            primary_discard_timer,
+            secondary_discard_timer,
+            discard_timer_status,
+            discard_timer_serr_enable,
         }
     }
 }
-impl From<u16> for BridgeControl {
-    fn from(word: u16) -> Self { BridgeControlProto::from(word).into() }
-}
-
-
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn from_word() {

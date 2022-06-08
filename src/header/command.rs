@@ -1,22 +1,4 @@
-use modular_bitfield::prelude::*;
-
-
-#[bitfield(bits = 16)]
-#[repr(u16)]
-pub struct CommandProto {
-    io_space: bool,
-    memory_space: bool,
-    bus_master: bool,
-    special_cycles: bool,
-    memory_write_and_invalidate_enable: bool,
-    vga_palette_snoop: bool,
-    parity_error_response: bool,
-    stepping: bool,
-    serr_enable: bool,
-    fast_back_to_back_enable: bool,
-    interrupt_disable: bool,
-    reserved: B5,
-}
+use heterob::{bit_numbering::Lsb, P12};
 
 /// Provides control over a device's ability to generate and respond to PCI cycles.
 ///
@@ -38,34 +20,44 @@ pub struct Command {
     pub interrupt_disable: bool,
     pub reserved: u8,
 }
-impl From<CommandProto> for Command {
-    fn from(proto: CommandProto) -> Self {
+
+impl From<u16> for Command {
+    fn from(word: u16) -> Self {
+        let Lsb((
+            io_space,
+            memory_space,
+            bus_master,
+            special_cycles,
+            memory_write_and_invalidate_enable,
+            vga_palette_snoop,
+            parity_error_response,
+            stepping,
+            serr_enable,
+            fast_back_to_back_enable,
+            interrupt_disable,
+            reserved,
+        )) = P12::<_, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 5>(word).into();
         Self {
-            io_space: proto.io_space(),
-            memory_space: proto.memory_space(),
-            bus_master: proto.bus_master(),
-            special_cycles: proto.special_cycles(),
-            memory_write_and_invalidate_enable: proto.memory_write_and_invalidate_enable(),
-            vga_palette_snoop: proto.vga_palette_snoop(),
-            parity_error_response: proto.parity_error_response(),
-            stepping: proto.stepping(),
-            serr_enable: proto.serr_enable(),
-            fast_back_to_back_enable: proto.fast_back_to_back_enable(),
-            interrupt_disable: proto.interrupt_disable(),
-            reserved: proto.reserved(),
+            io_space,
+            memory_space,
+            bus_master,
+            special_cycles,
+            memory_write_and_invalidate_enable,
+            vga_palette_snoop,
+            parity_error_response,
+            stepping,
+            serr_enable,
+            fast_back_to_back_enable,
+            interrupt_disable,
+            reserved,
         }
     }
 }
-impl From<u16> for Command {
-    fn from(word: u16) -> Self { CommandProto::from(word).into() }
-}
-
-
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn from_word() {
