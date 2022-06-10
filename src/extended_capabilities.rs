@@ -12,7 +12,7 @@ Extended Capabilities list:
 - [x] [Virtual Channel](virtual_channel) (VC) – used if an MFVC Extended Cap structure is not present in the device (0002h)
 - [x] [Device Serial Number](device_serial_number) (0003h)
 - [x] [Power Budgeting](power_budgeting) (0004h)
-- [ ] Root Complex Link Declaration (0005h)
+- [x] [Root Complex Link Declaration](root_complex_link_declaration) (0005h)
 - [ ] Root Complex Internal Link Control (0006h)
 - [ ] Root Complex Event Collector Endpoint Association (0007h)
 - [ ] Multi-Function Virtual Channel (MFVC) (0008h)
