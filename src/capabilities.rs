@@ -4,28 +4,28 @@
 Each Capability structure has a Capability ID assigned by the PCI-SIG.
 
 Capabilities list
-- [x] Null Capability (00h)
+- [x] [Null Capability](CapabilityKind::NullCapability) (00h)
 - [x] [PCI Power Management Interface](power_management_interface) (01h)
-- [ ] AGP (02h)
+- [ ] [AGP](accelerated_graphics_port) (02h)
 - [x] [VPD](vital_product_data) (03h)
 - [x] [Slot Identification](slot_identification) (04h)
 - [x] [Message Signaled Interrupts](message_signaled_interrups) (05h)
-- [x] CompactPCI Hot Swap (06h)
-- [ ] PCI-X (07h)
+- [ ] [CompactPCI Hot Swap](compact_pci_hot_swap) (06h)
+- [ ] [PCI-X](pci_x) (07h)
 - [x] [HyperTransport](hypertransport) (08h)
 - [x] [Vendor Specific](vendor_specific) (09h)
 - [x] [Debug port](debug_port) (0Ah)
-- [x] CompactPCI central resource control (0Bh)
-- [x] PCI Hot-Plug (0Ch)
+- [ ] [CompactPCI central resource control](compact_pci_resource_control) (0Bh)
+- [x] [PCI Hot-Plug](pci_hot_plug) (0Ch)
 - [x] [PCI Bridge Subsystem Vendor ID](bridge_subsystem_vendor_id) (0Dh)
-- [x] AGP 8x (0Eh)
-- [x] Secure Device (0Fh)
+- [x] [AGP 8x](agp_8x) (0Eh)
+- [x] [Secure Device](secure_device) (0Fh)
 - [x] [PCI Express](pci_express) (10h)
 - [x] [MSI-X](msi_x) (11h)
 - [x] [Serial ATA Data/Index Configuration](sata) (12h)
-- [x] [Advanced Features](advanced_features) (AF) (13h)
-- [ ] Enhanced Allocation (14h)
-- [ ] Flattening Portal Bridge (15h)
+- [x] [Advanced Features](advanced_features) (13h)
+- [ ] [Enhanced Allocation](enhanced_allocation) (14h)
+- [ ] [Flattening Portal Bridge](flattening_portal_bridge) (15h)
 
 Others Reserved
 
@@ -147,15 +147,13 @@ use snafu::prelude::*;
 
 use super::DDR_OFFSET;
 
-/// Each capability in the capability list consists of an 8-bit ID field assigned by the PCI SIG,
-/// an 8 bit pointer in configuration space to the next capability.
-pub const CAP_HEADER_LEN: usize = 2;
-
 // 01h PCI Power Management Interface
 pub mod power_management_interface;
 pub use power_management_interface::PowerManagementInterface;
 
 // 02h AGP
+pub mod accelerated_graphics_port;
+pub use accelerated_graphics_port::AcceleratedGraphicsPort;
 
 // 03h VPD
 pub mod vital_product_data;
@@ -169,11 +167,23 @@ pub use slot_identification::SlotIdentification;
 pub mod message_signaled_interrups;
 pub use message_signaled_interrups::MessageSignaledInterrups;
 
-/// 06h CompactPCI Hot Swap
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CompactPciHotSwap;
+// 06h CompactPCI Hot Swap
+pub mod compact_pci_hot_swap {
+    /*!
+    # CompactPCI Hot Swap
+
+    This Capability structure provides a standard interface to control and sense
+    status within a device that supports Hot Swap insertion and extraction in a
+    CompactPCI system.
+    */
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct CompactPciHotSwap;
+}
+pub use compact_pci_hot_swap::CompactPciHotSwap;
 
 // 07h PCI-X
+pub mod pci_x;
+pub use pci_x::PciX;
 
 // 08h HyperTransport
 pub mod hypertransport;
@@ -187,27 +197,52 @@ pub use vendor_specific::VendorSpecific;
 pub mod debug_port;
 pub use debug_port::DebugPort;
 
-/// 0Bh CompactPCI central resource control
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CompactPciResourceControl;
+// 0Bh CompactPCI central resource control
+pub mod compact_pci_resource_control {
+    /*!
+    # CompactPCI central resource control
+    */
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct CompactPciResourceControl;
+}
+pub use compact_pci_resource_control::CompactPciResourceControl;
 
-/// PCI Hot-Plug
-///
-/// This ID indicates that the associated device conforms to the Standard Hot-Plug Controller model
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PciHotPlug;
+// 0Ch PCI Hot-Plug
+pub mod pci_hot_plug {
+    /*!
+    # PCI Hot-Plug
+
+    This ID indicates that the associated device conforms to the Standard Hot-Plug
+    Controller model
+    */
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct PciHotPlug;
+}
+pub use pci_hot_plug::PciHotPlug;
 
 // 0Dh PCI Bridge Subsystem Vendor ID
 pub mod bridge_subsystem_vendor_id;
 pub use bridge_subsystem_vendor_id::BridgeSubsystemVendorId;
 
-/// 0Eh AGP 8x
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Agp8x;
+// 0Eh AGP 8x
+pub mod agp_8x {
+    /*!
+    # AGP 8x
+    */
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Agp8x;
+}
+pub use agp_8x::Agp8x;
 
-/// 0Fh Secure Device
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SecureDevice;
+// 0Fh Secure Device
+pub mod secure_device {
+    /*!
+    # Secure Device
+    */
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct SecureDevice;
+}
+pub use secure_device::SecureDevice;
 
 // 10h PCI Express
 pub mod pci_express;
@@ -226,8 +261,12 @@ pub mod advanced_features;
 pub use advanced_features::AdvancedFeatures;
 
 // 14h Enhanced Allocation
+pub mod enhanced_allocation;
+pub use enhanced_allocation::EnhancedAllocation;
 
 // 15h Flattening Portal Bridge
+pub mod flattening_portal_bridge;
+pub use flattening_portal_bridge::FlatteningPortalBridge;
 
 /// Capability parsing error
 #[derive(Debug, Clone, PartialEq, Eq, Snafu)]
@@ -317,6 +356,7 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
             .try_into()
             .map(Kind::PowerManagementInterface)
             .context(DataSnafu { ptr })?,
+        0x02 => Kind::AcceleratedGraphicsPort(AcceleratedGraphicsPort),
         0x03 => cap_data
             .try_into()
             .map(Kind::VitalProductData)
@@ -330,6 +370,7 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
             .map(Kind::MessageSignaledInterrups)
             .context(MessageSignaledInterrupsSnafu { ptr })?,
         0x06 => Kind::CompactPciHotSwap(CompactPciHotSwap),
+        0x07 => Kind::PciX(PciX),
         0x08 => cap_data
             .try_into()
             .map(Kind::Hypertransport)
@@ -366,6 +407,8 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
             .try_into()
             .map(Kind::AdvancedFeatures)
             .context(DataSnafu { ptr })?,
+        0x14 => Kind::EnhancedAllocation(EnhancedAllocation),
+        0x15 => Kind::FlatteningPortalBridge(FlatteningPortalBridge),
         v => Kind::Reserved(v),
     };
     Ok(Capability { pointer: ptr, kind })
@@ -386,19 +429,18 @@ impl<'a> Capability<'a> {
 /// Capability ID assigned by the PCI-SIG
 #[derive(Debug, PartialEq, Eq)]
 pub enum CapabilityKind<'a> {
-    /// 00h Null Capability
+    /// Null Capability (00h)
     ///
     /// This capability contains no registers. It may be present in any Function. Functions may
     /// contain multiple instances of this capability.
     NullCapability,
-    /// 01h PCI Power Management Interface
     PowerManagementInterface(PowerManagementInterface),
-    // AcceleratedGraphicsPort(AcceleratedGraphicsPort),
+    AcceleratedGraphicsPort(AcceleratedGraphicsPort),
     VitalProductData(VitalProductData),
     SlotIdentification(SlotIdentification),
     MessageSignaledInterrups(MessageSignaledInterrups),
     CompactPciHotSwap(CompactPciHotSwap),
-    // PciX(PciX),
+    PciX(PciX),
     Hypertransport(Hypertransport),
     VendorSpecific(VendorSpecific<'a>),
     DebugPort(DebugPort),
@@ -408,11 +450,11 @@ pub enum CapabilityKind<'a> {
     Agp8x(Agp8x),
     SecureDevice(SecureDevice),
     PciExpress(PciExpress),
-    /// 11h MSI-X
     MsiX(MsiX),
-    /// 12h Serial ATA Data/Index Configuration
     Sata(Sata),
     AdvancedFeatures(AdvancedFeatures),
+    EnhancedAllocation(EnhancedAllocation),
+    FlatteningPortalBridge(FlatteningPortalBridge),
     Reserved(u8),
 }
 
