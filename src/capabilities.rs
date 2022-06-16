@@ -6,7 +6,7 @@ Each Capability structure has a Capability ID assigned by the PCI-SIG.
 Capabilities list
 - [x] [Null Capability](CapabilityKind::NullCapability) (00h)
 - [x] [PCI Power Management Interface](power_management_interface) (01h)
-- [ ] [AGP](accelerated_graphics_port) (02h)
+- [x] [AGP](accelerated_graphics_port) (02h)
 - [x] [VPD](vital_product_data) (03h)
 - [x] [Slot Identification](slot_identification) (04h)
 - [x] [Message Signaled Interrupts](message_signaled_interrups) (05h)
@@ -356,7 +356,10 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
             .try_into()
             .map(Kind::PowerManagementInterface)
             .context(DataSnafu { ptr })?,
-        0x02 => Kind::AcceleratedGraphicsPort(AcceleratedGraphicsPort),
+        0x02 => cap_data
+            .try_into()
+            .map(Kind::AcceleratedGraphicsPort)
+            .context(DataSnafu { ptr })?,
         0x03 => cap_data
             .try_into()
             .map(Kind::VitalProductData)
