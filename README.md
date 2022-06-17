@@ -39,7 +39,7 @@ let header = Header::try_from(header_data).unwrap();
 assert_eq!((0x8086, 0x2030), (header.vendor_id, header.device_id));
 
 let device_depended_region_data = &conf_space[DDR_OFFSET..ECS_OFFSET];
-let mut caps = Capabilities::new(device_depended_region_data, header.capabilities_pointer);
+let mut caps = Capabilities::new(device_depended_region_data, &header);
 let BridgeSubsystemVendorId { subsystem_vendor_id, .. } =
     caps.find_map(|cap| {
         if let Ok(

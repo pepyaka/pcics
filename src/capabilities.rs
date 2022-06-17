@@ -43,6 +43,7 @@ Capabilities: [a8] SATA HBA v1.0 BAR4 Offset=00000004
 
 pcics capabilities:
 ```rust
+# use pcics::Header;
 # use pcics::capabilities::{
 #     Capabilities,
 #     Capability,
@@ -54,6 +55,10 @@ pcics capabilities:
 #     power_management_interface as pmi,
 #     sata,
 # };
+// Empty header
+let mut header: Header = [0u8; 0x40].as_slice().try_into().unwrap();
+// Set pointer to first capability
+header.capabilities_pointer = 0x80;
 
 let device_dependent_region = [
     // 0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
@@ -71,7 +76,7 @@ let device_dependent_region = [
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xb1,0x0f,0x06,0x08,0x00,0x00,0x00,0x00, // 0xf0
 ];
 
-let result = Capabilities::new(&device_dependent_region, 0x80)
+let result = Capabilities::new(&device_dependent_region, &header)
     .collect::<Vec<_>>();
 
 let sample = vec![
@@ -146,6 +151,7 @@ assert_eq!(sample, result);
 use snafu::prelude::*;
 
 use super::DDR_OFFSET;
+use crate::header::Header;
 
 // 01h PCI Power Management Interface
 pub mod power_management_interface;
@@ -319,11 +325,12 @@ pub struct CapabilityDataError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Capabilities<'a> {
     data: &'a [u8],
+    header: &'a Header,
     pointer: u8,
 }
 impl<'a> Capabilities<'a> {
-    pub fn new(data: &'a [u8], pointer: u8) -> Self {
-        Self { data, pointer }
+    pub fn new(data: &'a [u8], header: &'a Header) -> Self {
+        Self { data, header, pointer: header.capabilities_pointer }
     }
 }
 impl<'a> Iterator for Capabilities<'a> {
@@ -480,9 +487,9 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/tests/data/device/8086:9dc8/config"
         ));
+        let header = data.as_slice().try_into().unwrap();
         let ddr = &data[DDR_OFFSET..ECS_OFFSET];
-        let offset = data[0x34];
-        let result = Capabilities::new(ddr, offset).collect::<Vec<_>>();
+        let result = Capabilities::new(ddr, &header).collect::<Vec<_>>();
         let sample = vec![
             Ok(Capability {
                 pointer: 0x50,
