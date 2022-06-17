@@ -338,12 +338,12 @@ impl<'a> Iterator for Capabilities<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         // Stop iterating if next pointer is null
-        (self.pointer != 0).then(|| parse_cap(self.data, &mut self.pointer))
+        (self.pointer != 0).then(|| parse_cap(self.data, &mut self.pointer, self.header))
     }
 }
 
 type CapabilityResult<'a> = Result<Capability<'a>, CapabilityError>;
-fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
+fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8, header: &'a Header) -> CapabilityResult<'a> {
     let ptr = *pointer;
     // Capability data resides in Device dependent region (starts from 0x40)
     let offset = (*pointer as usize).checked_sub(DDR_OFFSET).ok_or_else(|| {
@@ -385,8 +385,7 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8) -> CapabilityResult<'a> {
             .try_into()
             .map(Kind::Hypertransport)
             .context(HypertransportSnafu { ptr })?,
-        0x09 => cap_data
-            .try_into()
+        0x09 => VendorSpecific::try_new(cap_data, header)
             .map(Kind::VendorSpecific)
             .context(VendorSpecificSnafu { ptr })?,
         0x0a => cap_data
@@ -499,7 +498,9 @@ mod tests {
             }),
             Ok(Capability {
                 pointer: 0x80,
-                kind: CapabilityKind::VendorSpecific(data[(0x80 + 2)..].try_into().unwrap()),
+                kind: VendorSpecific::try_new(&data[(0x80 + 2)..], &header)
+                    .map(CapabilityKind::VendorSpecific)
+                    .unwrap(),
             }),
             Ok(Capability {
                 pointer: 0x60,

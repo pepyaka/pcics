@@ -1,14 +1,54 @@
-//! Vendor Specific
-//!
-//! Allow device vendors to use the capability mechanism for vendor specific information. The
-//! layout of the information is vendor specific, except that the byte immediately following the
-//! “Next” pointer in the capability structure is defined to be a length field. 
-//! An example vendor specific usage is a device that is configured in the final
-//! manufacturing steps as either a 32-bit or 64-bit PCI agent and the Vendor Specific capability
-//! structure tells the device driver which features the device supports. 
+/*!
+# Vendor Specific
+
+Allow device vendors to use the capability mechanism for vendor specific information. The
+layout of the information is vendor specific, except that the byte immediately following the
+“Next” pointer in the capability structure is defined to be a length field.
+An example vendor specific usage is a device that is configured in the final
+manufacturing steps as either a 32-bit or 64-bit PCI agent and the Vendor Specific capability
+structure tells the device driver which features the device supports.
+
+## Struct diagram
+<pre>
+<a href="enum.VendorSpecific.html">VendorSpecific</a>
+└─ <a href="enum.Virtio.html">Virtio</a>
+</pre>
+
+## Examples
+
+> ```plaintext
+> VirtIO: CommonCfg
+>     BAR=4 offset=00000000 size=00001000
+> ```
+
+```rust
+# use pcics::{Header, capabilities::vendor_specific::*};
+let mut header: Header = [0; 0x40].try_into().unwrap();
+header.vendor_id = 0x1af4;
+header.device_id = 0x1048;
+
+let data = [
+    0x09, 0x7c, // Header
+    0x10, // Length
+    0x01, // Virtio type
+    0x04, // BAR
+    0x00, 0x00, 0x00,       // Reserved
+    0x00, 0x00, 0x00, 0x00, // Offset
+    0x00, 0x10, 0x00, 0x00, // Size
+];
+let result = VendorSpecific::try_new(&data[2..], &header).unwrap();
+let sample = VendorSpecific::Virtio(Virtio::CommonCfg {
+    bar: 4,
+    offset: 0x00,
+    size: 0x1000,
+});
+assert_eq!(sample, result);
+*/
 
 use snafu::prelude::*;
 use heterob::{endianness::Le, P5};
+
+use crate::header::Header;
 
 #[derive(Snafu, Debug, Clone, PartialEq, Eq)]
 pub enum VendorSpecificError {
@@ -20,39 +60,36 @@ pub enum VendorSpecificError {
     Virtio,
 }
 
-/// Only vendor-specific data length. Without Cap ID, Next Ptr and length itself
 #[derive(Debug, PartialEq, Eq)]
-pub struct VendorSpecific<'a>(pub &'a [u8]);
-impl<'a> VendorSpecific<'a> {
-    pub fn new(data: &'a [u8]) -> Self {
-        Self(data)
-    }
-    pub fn vendor_capability(&self, vendor_id: u16, device_id: u16) -> VendorCapabilty<'a> {
-        let data = self.0;
-        if let (0x1af4, 0x1000..=0x107f, Ok(v)) = (vendor_id, device_id, data.try_into()) {
-            VendorCapabilty::Virtio(v)
-        } else {
-            VendorCapabilty::Unspecified(data)
-        }
-    }
+pub enum VendorSpecific<'a> {
+    /// Only vendor-specific data. Without Cap ID, Next Ptr and length itself
+    Unspecified(&'a [u8]),
+    /// Known vendor-specific capabilities
+    Virtio(Virtio),
 }
-impl<'a> TryFrom<&'a [u8]> for VendorSpecific<'a> {
-    type Error = VendorSpecificError;
-    fn try_from(slice: &'a [u8]) -> Result<Self, Self::Error> {
-        let size: usize = slice.get(0).filter(|&&l| l > 0).copied()
-            .ok_or(VendorSpecificError::Length)?.into();
-        let data = slice.get(1..(size + 1))
+
+impl<'a> VendorSpecific<'a> {
+    pub fn try_new(slice: &'a [u8], header: &'a Header) -> Result<Self, VendorSpecificError> {
+        let size: usize = slice
+            .get(0)
+            // slice already without cap_id and next_ptr
+            .and_then(|l| l.checked_sub(2))
+            .ok_or(VendorSpecificError::Length)?
+            .into();
+        let slice = slice
+            .get(1..size)
             .ok_or(VendorSpecificError::Data { size })?;
-        Ok(VendorSpecific(data))
+        let result = match (header.vendor_id, header.device_id) {
+            (0x1af4, 0x1000..=0x107f) => slice.try_into().map(Self::Virtio)?,
+            _ => Self::Unspecified(slice),
+        };
+        Ok(result)
     }
 }
 
-/// Known vendor-specific capabilities
-#[derive(Debug, PartialEq, Eq)]
-pub enum VendorCapabilty<'a> {
-    Unspecified(&'a [u8]),
-    Virtio(Virtio),
-}
+
+
+
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Virtio {
