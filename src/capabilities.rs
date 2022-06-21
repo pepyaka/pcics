@@ -11,7 +11,7 @@ Capabilities list
 - [x] [Slot Identification](slot_identification) (04h)
 - [x] [Message Signaled Interrupts](message_signaled_interrups) (05h)
 - [ ] [CompactPCI Hot Swap](compact_pci_hot_swap) (06h)
-- [ ] [PCI-X](pci_x) (07h)
+- [x] [PCI-X](pci_x) (07h)
 - [x] [HyperTransport](hypertransport) (08h)
 - [x] [Vendor Specific](vendor_specific) (09h)
 - [x] [Debug port](debug_port) (0Ah)
@@ -151,7 +151,7 @@ assert_eq!(sample, result);
 use snafu::prelude::*;
 
 use super::DDR_OFFSET;
-use crate::header::Header;
+use crate::header::{Header, HeaderType};
 
 // 01h PCI Power Management Interface
 pub mod power_management_interface;
@@ -189,7 +189,7 @@ pub use compact_pci_hot_swap::CompactPciHotSwap;
 
 // 07h PCI-X
 pub mod pci_x;
-pub use pci_x::PciX;
+pub use pci_x::{PciX, PciXBridge};
 
 // 08h HyperTransport
 pub mod hypertransport;
@@ -306,6 +306,16 @@ pub enum CapabilityError {
         ptr: u8,
         source: message_signaled_interrups::MessageSignaledInterrupsError,
     },
+    #[snafu(display("[{ptr:02x}] PCI-X error: {source}"))]
+    PciX {
+        ptr: u8,
+        source: pci_x::PciXError,
+    },
+    #[snafu(display("[{ptr:02x}] PCI-X Bridge error: {source}"))]
+    PciXBridge {
+        ptr: u8,
+        source: pci_x::PciXBridgeError,
+    },
 }
 
 
@@ -380,7 +390,19 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8, header: &'a Header) -> Capab
             .map(Kind::MessageSignaledInterrups)
             .context(MessageSignaledInterrupsSnafu { ptr })?,
         0x06 => Kind::CompactPciHotSwap(CompactPciHotSwap),
-        0x07 => Kind::PciX(PciX),
+        0x07 => {
+            if matches!(header.header_type, HeaderType::Bridge(_)) {
+                cap_data
+                    .try_into()
+                    .map(Kind::PciXBridge)
+                    .context(PciXBridgeSnafu { ptr })?
+            } else {
+                cap_data
+                    .try_into()
+                    .map(Kind::PciX)
+                    .context(PciXSnafu { ptr })?
+            }
+        }
         0x08 => cap_data
             .try_into()
             .map(Kind::Hypertransport)
@@ -423,6 +445,10 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8, header: &'a Header) -> Capab
     Ok(Capability { pointer: ptr, kind })
 }
 
+
+
+
+
 /// Capability structure
 #[derive(Debug, PartialEq, Eq)]
 pub struct Capability<'a> {
@@ -450,6 +476,7 @@ pub enum CapabilityKind<'a> {
     MessageSignaledInterrups(MessageSignaledInterrups),
     CompactPciHotSwap(CompactPciHotSwap),
     PciX(PciX),
+    PciXBridge(PciXBridge),
     Hypertransport(Hypertransport),
     VendorSpecific(VendorSpecific<'a>),
     DebugPort(DebugPort),
