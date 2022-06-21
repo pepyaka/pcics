@@ -302,14 +302,14 @@ impl From<[u8; Header::TOTAL_SIZE]> for Header {
                                 io_access_address_range_1,
                             ),
                             bridge_control: From::<u16>::from(bridge_control),
-                    subsystem_vendor_id: None,
-                    subsystem_device_id: None,
-                    legacy_mode_base_address: None,
-                    reserved: None,
+                            subsystem_vendor_id: None,
+                            subsystem_device_id: None,
+                            legacy_mode_base_address: None,
+                            reserved: None,
                         }),
                     )
                 }
-                _ => todo!(),
+                v => (0, 0, 0, HeaderType::Reserved(v)),
             };
         Self {
             vendor_id,
@@ -329,6 +329,7 @@ impl From<[u8; Header::TOTAL_SIZE]> for Header {
         }
     }
 }
+
 
 impl TryFrom<&[u8]> for Header {
     type Error = TryFromSliceError;
