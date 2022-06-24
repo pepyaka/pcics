@@ -376,6 +376,22 @@ impl HeaderType {
     }
 }
 
+impl From<HeaderType> for u8 {
+    fn from(data: HeaderType) -> Self {
+        (&data).into()
+    }
+}
+
+impl<'a> From<&'a HeaderType> for u8 {
+    fn from(data: &'a HeaderType) -> Self {
+        match data {
+            HeaderType::Normal(_) => 0,
+            HeaderType::Bridge(_) => 1,
+            HeaderType::Cardbus(_) => 2,
+            HeaderType::Reserved(v) => *v,
+        }
+    }
+}
 
 /// General device (Type 00h)
 #[derive(Debug, Clone, PartialEq, Eq)]
