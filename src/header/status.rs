@@ -1,4 +1,3 @@
-use displaydoc::Display as DisplayDoc;
 use heterob::{bit_numbering::Lsb, P13};
 
 /// The Status register is used to record status information for PCI bus related events.
@@ -66,7 +65,7 @@ impl<const T: char> From<u16> for Status<T> {
     }
 }
 
-#[derive(DisplayDoc, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DevselTiming {
     /// fast
     Fast,

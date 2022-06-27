@@ -65,7 +65,6 @@ use heterob::{bit_numbering::Lsb, endianness::Le, Seq, P12, P3, P4, P8};
 
 use super::CapabilityDataError;
 
-use displaydoc::Display as DisplayDoc;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct PowerManagementInterface {
@@ -182,7 +181,7 @@ pub struct Capabilities {
 
 /// This 3 bit field reports the 3.3Vaux auxiliary current requirements for the PCI function.
 /// he [Data] Register takes precedence over this field for 3.3Vaux current and value must be 0.
-#[derive(DisplayDoc, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum AuxCurrent {
     /// 0mA
     SelfPowered,
