@@ -25,7 +25,7 @@ Capabilities list
 - [x] [Serial ATA Data/Index Configuration](sata) (12h)
 - [x] [Advanced Features](advanced_features) (13h)
 - [x] [Enhanced Allocation](enhanced_allocation) (14h)
-- [ ] [Flattening Portal Bridge](flattening_portal_bridge) (15h)
+- [x] [Flattening Portal Bridge](flattening_portal_bridge) (15h)
 
 Others Reserved
 
@@ -446,7 +446,10 @@ fn parse_cap<'a>(bytes: &'a [u8], pointer: &mut u8, header: &'a Header) -> Capab
         0x14 => EnhancedAllocation::try_new(cap_data, header)
             .map(Kind::EnhancedAllocation)
             .context(EnhancedAllocationSnafu { ptr })?,
-        0x15 => Kind::FlatteningPortalBridge(FlatteningPortalBridge),
+        0x15 => cap_data
+            .try_into()
+            .map(Kind::FlatteningPortalBridge)
+            .context(DataSnafu { ptr })?,
         v => Kind::Reserved(v),
     };
     Ok(Capability { pointer: ptr, kind })
