@@ -39,6 +39,7 @@ let data = [
     0x67, 0x45, 0x23, 0x01, // FPB Vector Access Data
 ];
 let sample = FlatteningPortalBridge {
+    reserved: 0,
     fpb_capabilities: FpbCapabilities {
         fpb_rid_decode_mechanism_supported: true,
         fpb_mem_low_decode_mechanism_supported: false,
@@ -82,6 +83,7 @@ use super::CapabilityDataError;
 /// Flattening Portal Bridge (FPB) Capability
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlatteningPortalBridge {
+    pub reserved: u16,
     pub fpb_capabilities: FpbCapabilities,
     pub fpb_rid_vector_control: FpbRidVectorControl,
     pub fpb_mem_low_vector_control: FpbMemLowVectorControl,
@@ -123,8 +125,8 @@ impl From<[u8; Self::SIZE]> for FlatteningPortalBridge {
             vector_access_control,
             fpb_vector_access_data,
         )) = P9(bytes).into();
-        let _: u16 = reserved;
         Self {
+            reserved,
             fpb_capabilities: From::<u32>::from(capabilities),
             fpb_rid_vector_control: FpbRidVectorControl::new(
                 rid_vector_control_1,
@@ -297,7 +299,7 @@ impl FpbRidVectorControl {
         Self {
             fpb_rid_decode_mechanism_enable,
             fpb_rid_vector_granularity: From::<u8>::from(granularity),
-            fpb_rid_vector_start: (start << 3) & (u16::MAX << (3 + granularity)),
+            fpb_rid_vector_start: (start << 3) & u16::MAX.wrapping_shl(3 + granularity as u32),
             rid_secondary_start,
         }
     }
@@ -344,7 +346,8 @@ impl From<u32> for FpbMemLowVectorControl {
         Self {
             fpb_mem_low_decode_mechanism_enable,
             fpb_mem_low_vector_granularity: From::<u8>::from(granularity),
-            fpb_mem_low_vector_start: (start << 20) & (u32::MAX << (20 + granularity)),
+            fpb_mem_low_vector_start: (start << 20)
+                & u32::MAX.wrapping_shl(20 + granularity as u32),
         }
     }
 }
@@ -394,7 +397,7 @@ impl FpbMemHighVectorControl {
         let _: u64 = start;
         let start_low = start << 28;
         let start_high = (control_2 as u64) << 32;
-        let mask = u64::MAX << (28 + granularity);
+        let mask = u64::MAX.wrapping_shl(28 + granularity as u32);
         Self {
             fpb_mem_high_decode_mechanism_enable,
             fpb_mem_high_vector_granularity: From::<u8>::from(granularity),
