@@ -1,6 +1,6 @@
 [package]
 name = "pcics"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["mbratchikov"]
 license = "MIT"
 readme = "README.md"
@@ -8,12 +8,12 @@ repository = "https://github.com/pepyaka/pcics"
 documentation = "https://docs.rs/pcics"
 homepage = "https://github.com/pepyaka/pcics"
 description = "PCI configuration space access library"
-categories = ["hardware-support"]
+categories = ["hardware-support", "no-std"]
 edition = "2021"
 
 [dependencies]
 heterob = "0.2.0"
-snafu = { version = "0.7.0", default-features = false, features = ["rust_1_46"] }
+snafu = { version = "0.7.1", default-features = false, features = ["rust_1_46"] }
 
 [dev-dependencies]
 pretty_assertions = "0.7"
