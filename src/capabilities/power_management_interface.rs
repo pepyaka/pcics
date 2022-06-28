@@ -66,7 +66,7 @@ use heterob::{bit_numbering::Lsb, endianness::Le, Seq, P12, P3, P4, P8};
 use super::CapabilityDataError;
 
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PowerManagementInterface {
     pub capabilities: Capabilities,
     pub control: Control,
@@ -158,7 +158,7 @@ impl TryFrom<&[u8]> for PowerManagementInterface {
 }
 
 /// Provides information on the capabilities of the function related to power management
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Capabilities {
     /// Default value of 0b10 indicates that this function complies with Revision 1.1 of the PCI
     /// Power Management Interface Specification.
@@ -181,7 +181,7 @@ pub struct Capabilities {
 
 /// This 3 bit field reports the 3.3Vaux auxiliary current requirements for the PCI function.
 /// he [Data] Register takes precedence over this field for 3.3Vaux current and value must be 0.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuxCurrent {
     /// 0mA
     SelfPowered,
@@ -217,7 +217,7 @@ impl From<u8> for AuxCurrent {
 }
 
 /// Indicates the power states in which the function may assert PME#.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PmeSupport {
     /// PME# can be asserted from D0
     pub d0: bool,
@@ -232,7 +232,7 @@ pub struct PmeSupport {
 }
 
 /// Used to manage the PCI function’s power management state as well as to enable/monitor PMEs.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Control {
     pub power_state: PowerState,
     /// State of the Function after writing the PowerState field to transition the Function
@@ -268,7 +268,7 @@ impl From<u8> for PowerState {
 }
 
 /// PCI bridge specific functionality and is required for all PCI-toPCI bridges
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bridge {
     /// Value at reset 0b000000
     pub reserved: u8,
