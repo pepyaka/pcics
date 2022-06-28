@@ -7,51 +7,60 @@ Configuration Space are accessible using only the PCI Express Enhanced Configura
 Mechanism (ECAM).
 
 Extended Capabilities list:
-- [x] Null Capability (0000h)
-- [x] [Advanced Error Reporting](advanced_error_reporting) (AER) (0001h)
-- [x] [Virtual Channel](virtual_channel) (VC) – used if an MFVC Extended Cap structure is not present in the device (0002h)
+- [x] [Null Capability](ExtendedCapabilityKind::Null) (0000h)
+- [x] [Advanced Error Reporting (AER)](advanced_error_reporting) (0001h)
+- [x] [Virtual Channel (VC)](virtual_channel) (0002h) - used if an MFVC Extended Cap structure is **not** present in the device
 - [x] [Device Serial Number](device_serial_number) (0003h)
 - [x] [Power Budgeting](power_budgeting) (0004h)
 - [x] [Root Complex Link Declaration](root_complex_link_declaration) (0005h)
-- [ ] Root Complex Internal Link Control (0006h)
-- [ ] Root Complex Event Collector Endpoint Association (0007h)
-- [ ] Multi-Function Virtual Channel (MFVC) (0008h)
-- [x] [Virtual Channel](virtual_channel) (VC) – used if an MFVC Extended Cap structure is present in the device (0009h)
-- [ ] Root Complex Register Block (RCRB) Header (000Ah)
-- [x] [Vendor-Specific Extended Capability](vendor_specific_extended_capability) (VSEC) (000Bh)
-- [ ] Configuration Access Correlation (CAC) (000Ch)
-- [x] [Access Control Services](access_control_services) (ACS) (000Dh)
-- [x] [Alternative Routing-ID Interpretation](alternative_routing_id_interpolation) (ARI) (000Eh)
-- [x] [Address Translation Services](address_translation_services) (ATS) (000Fh)
-- [x] [Single Root I/O Virtualization](single_root_io_virtualization) (SR-IOV) (0010h)
-- [ ] Multi-Root I/O Virtualization (MR-IOV) (0011h)
-- [ ] Multicast (0012h)
-- [x] [Page Request Interface](page_request_interface) (PRI) (0013h)
-- [ ] Reserved for AMD (0014h)
-- [ ] Resizable BAR (0015h)
-- [ ] Dynamic Power Allocation (DPA) (0016h)
+- [ ] [Root Complex Internal Link Control](root_complex_internal_link_control) (0006h)
+- [ ] [Root Complex Event Collector Endpoint Association](root_complex_event_collector_endpoint_association) (0007h)
+- [ ] [Multi-Function Virtual Channel (MFVC)](multifunction_virtual_channel) (0008h)
+- [x] [Virtual Channel (VC)](virtual_channel) (0009h) – used if an MFVC Extended Cap structure is present in the device
+- [ ] [Root Complex Register Block (RCRB) Header](root_complex_register_block_header) (000Ah)
+- [x] [Vendor-Specific Extended Capability (VSEC)](vendor_specific_extended_capability) (000Bh)
+- [ ] [Configuration Access Correlation (CAC)](configuration_access_correlation) (000Ch)
+- [x] [Access Control Services (ACS)](access_control_services) (000Dh)
+- [x] [Alternative Routing-ID Interpretation (ARI)](alternative_routing_id_interpolation) (000Eh)
+- [x] [Address Translation Services (ATS)](address_translation_services) (000Fh)
+- [x] [Single Root I/O Virtualization (SR-IOV)](single_root_io_virtualization) (0010h)
+- [ ] [Multi-Root I/O Virtualization (MR-IOV)](multi_root_io_virtualization) (0011h)
+- [ ] [Multicast](multicast) (0012h)
+- [x] [Page Request Interface (PRI)](page_request_interface) (0013h)
+- [ ] [Reserved for AMD](reserved_for_amd) (0014h)
+- [ ] [Resizable BAR](resizable_bar) (0015h)
+- [ ] [Dynamic Power Allocation (DPA)](dynamic_power_allocation) (0016h)
 - [x] [TPH Requester](tph_requester) (0017h)
 - [x] [Latency Tolerance Reporting (LTR)](latency_tolerance_reporting) (0018h)
 - [x] [Secondary PCI Express](secondary_pci_express) (0019h)
-- [ ] Protocol Multiplexing (PMUX) (001Ah)
-- [x] [Process Address Space ID](process_address_space_id) (PASID) (001Bh)
-- [ ] LN Requester (LNR) (001Ch)
-- [x] [Downstream Port Containment](downstream_port_containment) (DPC) (001Dh)
+- [ ] [Protocol Multiplexing (PMUX)](protocol_multiplexing) (001Ah)
+- [x] [Process Address Space ID (PASID)](process_address_space_id) (001Bh)
+- [ ] [LN Requester (LNR)](ln_requester) (001Ch)
+- [x] [Downstream Port Containment (DPC)](downstream_port_containment) (001Dh)
 - [x] [L1 PM Substates](l1_pm_substates) (001Eh)
-- [x] [Precision Time Measurement](precision_time_measurement) (PTM) (001Fh)
-- [ ] PCI Express over M-PHY (M-PCIe) (0020h)
-- [ ] FRS Queueing (0021h)
-- [ ] Readiness Time Reporting (0022h)
-- [ ] Designated Vendor-Specific Extended Capability (0023h)
-- [ ] VF Resizable BAR (0024h)
-- [ ] Data Link Feature (0025h)
-- [ ] Physical Layer 16.0 GT/s (0026h)
-- [ ] Lane Margining at the Receiver (0027h)
-- [ ] Hierarchy ID (0028h)
-- [ ] Native PCIe Enclosure Management (NPEM) (0029h)
-- [ ] Physical Layer 32.0 GT/s (002Ah)
-- [ ] Alternate Protocol (002Bh)
-- [ ] System Firmware Intermediary (SFI) (002Ch)
+- [x] [Precision Time Measurement (PTM)](precision_time_measurement) (001Fh)
+- [ ] [PCI Express over M-PHY (M-PCIe)](pci_express_over_m_phy) (0020h)
+- [ ] [FRS Queueing](frs_queueing) (0021h)
+- [ ] [Readiness Time Reporting](readiness_time_reporting) (0022h)
+- [ ] [Designated Vendor-Specific Extended Capability](designated_vendor_specific_extended_capability) (0023h)
+- [ ] [VF Resizable BAR](vf_resizable_bar) (0024h)
+- [ ] [Data Link Feature](data_link_feature) (0025h)
+- [ ] [Physical Layer 16.0 GT/s](physical_layer_16_gtps) (0026h)
+- [ ] [Lane Margining at the Receiver](lane_margining_at_the_receiver) (0027h)
+- [ ] [Hierarchy ID](hierarchy_id) (0028h)
+- [ ] [Native PCIe Enclosure Management (NPEM)](native_pcie_enclosure_management) (0029h)
+- [ ] [Physical Layer 32.0 GT/s](physical_layer_32_gtps) (002Ah)
+- [ ] [Alternate Protocol](alternate_protocol) (002Bh)
+- [ ] [System Firmware Intermediary (SFI)](system_firmware_intermediary) (002Ch)
+- [ ] [Shadow Functions](shadow_functions) (002Dh)
+- [ ] [Data Object Exchange](data_object_exchange) (002Eh)
+- [ ] [Device 3](device_3) (002Fh)
+- [ ] [Integrity and Data Encryption (IDE)](integrity_and_data_encryption) (0030h)
+- [ ] [Physical Layer 64.0 GT/s Capability](physical_layer_64_gtps) (0031h)
+- [ ] [Flit Logging](flit_logging) (0032h)
+- [ ] [Flit Performance Measurement](flit_performance_measurement) (0033h)
+- [ ] [Flit Error Injection](flit_error_injection) (0034h)
+
 Others Reserved
 
 ## Example
@@ -204,15 +213,15 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
                         .context(DataSnafu { offset })?,
             0x0005 => ecap_data.try_into().map(Kind::RootComplexLinkDeclaration)
                         .context(RootComplexLinkDeclarationSnafu { offset })?,
-            0x0006 => Kind::RootComplexInternalLinkControl,
-            0x0007 => Kind::RootComplexEventCollectorEndpointAssociation,
-            0x0008 => Kind::MultiFunctionVirtualChannel,
+            0x0006 => Kind::RootComplexInternalLinkControl(RootComplexInternalLinkControl),
+            0x0007 => Kind::RootComplexEventCollectorEndpointAssociation(RootComplexEventCollectorEndpointAssociation),
+            0x0008 => Kind::MultifunctionVirtualChannel(MultifunctionVirtualChannel),
             0x0009 => ecap_data.try_into().map(Kind::VirtualChannelMfvcPresent)
                         .context(DataSnafu { offset })?,
-            0x000A => Kind::RootComplexRegisterBlock,
+            0x000A => Kind::RootComplexRegisterBlockHeader(RootComplexRegisterBlockHeader),
             0x000B => ecap_data.try_into().map(Kind::VendorSpecificExtendedCapability)
                         .context(DataSnafu { offset })?,
-            0x000C => Kind::ConfigurationAccessCorrelation,
+            0x000C => Kind::ConfigurationAccessCorrelation(ConfigurationAccessCorrelation),
             0x000D => ecap_data.try_into().map(Kind::AccessControlServices)
                         .context(DataSnafu { offset })?,
             0x000E => ecap_data.try_into().map(Kind::AlternativeRoutingIdInterpretation)
@@ -221,42 +230,42 @@ fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> Extended
                         .context(DataSnafu { offset })?,
             0x0010 => ecap_data.try_into().map(Kind::SingleRootIoVirtualization)
                         .context(DataSnafu { offset })?,
-            0x0011 => Kind::MultiRootIoVirtualization,
-            0x0012 => Kind::Multicast,
+            0x0011 => Kind::MultiRootIoVirtualization(MultiRootIoVirtualization),
+            0x0012 => Kind::Multicast(Multicast),
             0x0013 => ecap_data.try_into().map(Kind::PageRequestInterface)
                         .context(DataSnafu { offset })?,
-            0x0014 => Kind::AmdReserved,
-            0x0015 => Kind::ResizableBar,
-            0x0016 => Kind::DynamicPowerAllocation,
+            0x0014 => Kind::ReservedForAmd(ReservedForAmd),
+            0x0015 => Kind::ResizableBar(ResizableBar),
+            0x0016 => Kind::DynamicPowerAllocation(DynamicPowerAllocation),
             0x0017 => ecap_data.try_into().map(Kind::TphRequester)
                         .context(DataSnafu { offset })?,
             0x0018 => ecap_data.try_into().map(Kind::LatencyToleranceReporting)
                         .context(DataSnafu { offset })?,
             0x0019 => ecap_data.try_into().map(Kind::SecondaryPciExpress)
                         .context(DataSnafu { offset })?,
-            0x001A => Kind::ProtocolMultiplexing,
+            0x001A => Kind::ProtocolMultiplexing(ProtocolMultiplexing),
             0x001B => ecap_data.try_into().map(Kind::ProcessAddressSpaceId)
                         .context(DataSnafu { offset })?,
-            0x001C => Kind::LnRequester,
+            0x001C => Kind::LnRequester(LnRequester),
             0x001D => ecap_data.try_into().map(Kind::DownstreamPortContainment)
                         .context(DownstreamPortContainmentSnafu { offset })?,
             0x001E => ecap_data.try_into().map(Kind::L1PmSubstates)
                         .context(DataSnafu { offset })?,
             0x001F => ecap_data.try_into().map(Kind::PrecisionTimeMeasurement)
                         .context(DataSnafu { offset })?,
-            0x0020 => Kind::PciExpressOverMphy,
-            0x0021 => Kind::FrsQueueing,
-            0x0022 => Kind::ReadinessTimeReporting,
-            0x0023 => Kind::DesignatedVendorSpecificExtendedCapability,
-            0x0024 => Kind::VFResizableBar,
-            0x0025 => Kind::DataLinkFeature,
-            0x0026 => Kind::PhysicalLayer16GTps,
-            0x0027 => Kind::ReceiverLaneMargining,
-            0x0028 => Kind::HierarchyId,
-            0x0029 => Kind::NativePcieEnclosureManagement,
-            0x002A => Kind::PhysicalLayer32GTps,
-            0x002B => Kind::AlternateProtocol,
-            0x002C => Kind::SystemFirmwareIntermediary,
+            0x0020 => Kind::PciExpressOverMphy(PciExpressOverMphy),
+            0x0021 => Kind::FrsQueueing(FrsQueueing),
+            0x0022 => Kind::ReadinessTimeReporting(ReadinessTimeReporting),
+            0x0023 => Kind::DesignatedVendorSpecificExtendedCapability(DesignatedVendorSpecificExtendedCapability),
+            0x0024 => Kind::VfResizableBar(VfResizableBar),
+            0x0025 => Kind::DataLinkFeature(DataLinkFeature),
+            0x0026 => Kind::PhysicalLayer16GTps(PhysicalLayer16GTps),
+            0x0027 => Kind::LaneMarginingAtTheReceiver(LaneMarginingAtTheReceiver),
+            0x0028 => Kind::HierarchyId(HierarchyId),
+            0x0029 => Kind::NativePcieEnclosureManagement(NativePcieEnclosureManagement),
+            0x002A => Kind::PhysicalLayer32GTps(PhysicalLayer32GTps),
+            0x002B => Kind::AlternateProtocol(AlternateProtocol),
+            0x002C => Kind::SystemFirmwareIntermediary(SystemFirmwareIntermediary),
                  v => Kind::Reserved(v),
         };
         Ok(ExtendedCapability { kind, version, offset })
@@ -278,45 +287,53 @@ impl<'a> ExtendedCapability<'a> {
             ExtendedCapabilityKind::DeviceSerialNumber(_) => 0x0003,
             ExtendedCapabilityKind::PowerBudgeting(_) => 0x0004,
             ExtendedCapabilityKind::RootComplexLinkDeclaration(_) => 0x0005,
-            ExtendedCapabilityKind::RootComplexInternalLinkControl => 0x0006,
-            ExtendedCapabilityKind::RootComplexEventCollectorEndpointAssociation => 0x0007,
-            ExtendedCapabilityKind::MultiFunctionVirtualChannel => 0x0008,
+            ExtendedCapabilityKind::RootComplexInternalLinkControl(_) => 0x0006,
+            ExtendedCapabilityKind::RootComplexEventCollectorEndpointAssociation(_) => 0x0007,
+            ExtendedCapabilityKind::MultifunctionVirtualChannel(_) => 0x0008,
             ExtendedCapabilityKind::VirtualChannelMfvcPresent(_) => 0x0009,
-            ExtendedCapabilityKind::RootComplexRegisterBlock => 0x000A,
+            ExtendedCapabilityKind::RootComplexRegisterBlockHeader(_) => 0x000A,
             ExtendedCapabilityKind::VendorSpecificExtendedCapability(_) => 0x000B,
-            ExtendedCapabilityKind::ConfigurationAccessCorrelation => 0x000C,
+            ExtendedCapabilityKind::ConfigurationAccessCorrelation(_) => 0x000C,
             ExtendedCapabilityKind::AccessControlServices(_) => 0x000D,
             ExtendedCapabilityKind::AlternativeRoutingIdInterpretation(_) => 0x000E,
             ExtendedCapabilityKind::AddressTranslationServices(_) => 0x000F,
             ExtendedCapabilityKind::SingleRootIoVirtualization(_) => 0x0010,
-            ExtendedCapabilityKind::MultiRootIoVirtualization => 0x0011,
-            ExtendedCapabilityKind::Multicast => 0x0012,
+            ExtendedCapabilityKind::MultiRootIoVirtualization(_) => 0x0011,
+            ExtendedCapabilityKind::Multicast(_) => 0x0012,
             ExtendedCapabilityKind::PageRequestInterface(_) => 0x0013,
-            ExtendedCapabilityKind::AmdReserved => 0x0014,
-            ExtendedCapabilityKind::ResizableBar => 0x0015,
-            ExtendedCapabilityKind::DynamicPowerAllocation => 0x0016,
+            ExtendedCapabilityKind::ReservedForAmd(_) => 0x0014,
+            ExtendedCapabilityKind::ResizableBar(_) => 0x0015,
+            ExtendedCapabilityKind::DynamicPowerAllocation(_) => 0x0016,
             ExtendedCapabilityKind::TphRequester(_) => 0x0017,
             ExtendedCapabilityKind::LatencyToleranceReporting(_) => 0x0018,
             ExtendedCapabilityKind::SecondaryPciExpress(_) => 0x0019,
-            ExtendedCapabilityKind::ProtocolMultiplexing => 0x001A,
+            ExtendedCapabilityKind::ProtocolMultiplexing(_) => 0x001A,
             ExtendedCapabilityKind::ProcessAddressSpaceId(_) => 0x001B,
-            ExtendedCapabilityKind::LnRequester => 0x001C,
+            ExtendedCapabilityKind::LnRequester(_) => 0x001C,
             ExtendedCapabilityKind::DownstreamPortContainment(_) => 0x001D,
             ExtendedCapabilityKind::L1PmSubstates(_) => 0x001E,
             ExtendedCapabilityKind::PrecisionTimeMeasurement(_) => 0x001F,
-            ExtendedCapabilityKind::PciExpressOverMphy => 0x0020,
-            ExtendedCapabilityKind::FrsQueueing => 0x0021,
-            ExtendedCapabilityKind::ReadinessTimeReporting => 0x0022,
-            ExtendedCapabilityKind::DesignatedVendorSpecificExtendedCapability => 0x0023,
-            ExtendedCapabilityKind::VFResizableBar => 0x0024,
-            ExtendedCapabilityKind::DataLinkFeature => 0x0025,
-            ExtendedCapabilityKind::PhysicalLayer16GTps => 0x0026,
-            ExtendedCapabilityKind::ReceiverLaneMargining => 0x0027,
-            ExtendedCapabilityKind::HierarchyId => 0x0028,
-            ExtendedCapabilityKind::NativePcieEnclosureManagement => 0x0029,
-            ExtendedCapabilityKind::PhysicalLayer32GTps => 0x002A,
-            ExtendedCapabilityKind::AlternateProtocol => 0x002B,
-            ExtendedCapabilityKind::SystemFirmwareIntermediary => 0x002C,
+            ExtendedCapabilityKind::PciExpressOverMphy(_) => 0x0020,
+            ExtendedCapabilityKind::FrsQueueing(_) => 0x0021,
+            ExtendedCapabilityKind::ReadinessTimeReporting(_) => 0x0022,
+            ExtendedCapabilityKind::DesignatedVendorSpecificExtendedCapability(_) => 0x0023,
+            ExtendedCapabilityKind::VfResizableBar(_) => 0x0024,
+            ExtendedCapabilityKind::DataLinkFeature(_) => 0x0025,
+            ExtendedCapabilityKind::PhysicalLayer16GTps(_) => 0x0026,
+            ExtendedCapabilityKind::LaneMarginingAtTheReceiver(_) => 0x0027,
+            ExtendedCapabilityKind::HierarchyId(_) => 0x0028,
+            ExtendedCapabilityKind::NativePcieEnclosureManagement(_) => 0x0029,
+            ExtendedCapabilityKind::PhysicalLayer32GTps(_) => 0x002A,
+            ExtendedCapabilityKind::AlternateProtocol(_) => 0x002B,
+            ExtendedCapabilityKind::SystemFirmwareIntermediary(_) => 0x002C,
+            ExtendedCapabilityKind::ShadowFunctions(_) => 0x002D,
+            ExtendedCapabilityKind::DataObjectExchange(_) => 0x002E,
+            ExtendedCapabilityKind::Device3(_) => 0x002F,
+            ExtendedCapabilityKind::IntegrityAndDataEncryption(_) => 0x0030,
+            ExtendedCapabilityKind::PhysicalLayer64GTps(_) => 0x0031,
+            ExtendedCapabilityKind::FlitLogging(_) => 0x0032,
+            ExtendedCapabilityKind::FlitPerformanceMeasurement(_) => 0x0033,
+            ExtendedCapabilityKind::FlitErrorInjection(_) => 0x0034,
             ExtendedCapabilityKind::Reserved(v) => v,
         }
     }
@@ -338,20 +355,20 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Root Complex Link Declaration
     RootComplexLinkDeclaration(RootComplexLinkDeclaration<'a>),
     /// Root Complex Internal Link Control
-    RootComplexInternalLinkControl,
+    RootComplexInternalLinkControl(RootComplexInternalLinkControl),
     /// Root Complex Event Collector Endpoint Association
-    RootComplexEventCollectorEndpointAssociation,
+    RootComplexEventCollectorEndpointAssociation(RootComplexEventCollectorEndpointAssociation),
     /// Multi-Function Virtual Channel (MFVC)
-    MultiFunctionVirtualChannel,
+    MultifunctionVirtualChannel(MultifunctionVirtualChannel),
     /// Virtual Channel (VC) – used if an MFVC Extended Cap structure is present in the device
     VirtualChannelMfvcPresent(VirtualChannel<'a>),
     /// Root Complex Register Block (RCRB) Header
-    RootComplexRegisterBlock,
+    RootComplexRegisterBlockHeader(RootComplexRegisterBlockHeader),
     /// Vendor-Specific Extended Capability (VSEC)
     VendorSpecificExtendedCapability(VendorSpecificExtendedCapability<'a>),
     /// Configuration Access Correlation (CAC) – defined by the Trusted Configuration Space (TCS)
-    /// for PCI Express ECN, which is no longer supported
-    ConfigurationAccessCorrelation,
+    /// for PCI Express ECN, which is no longer supporte(ECNd
+    ConfigurationAccessCorrelation(ConfigurationAccessCorrelation),
     /// Access Control Services (ACS)
     AccessControlServices(AccessControlServices<'a>),
     /// Alternative Routing-ID Interpretation (ARI)
@@ -362,17 +379,17 @@ pub enum ExtendedCapabilityKind<'a> {
     SingleRootIoVirtualization(SingleRootIoVirtualization),
     /// Multi-Root I/O Virtualization (MR-IOV) – defined in the Multi-Root I/O Virtualization and
     /// Sharing Specification
-    MultiRootIoVirtualization,
+    MultiRootIoVirtualization(MultiRootIoVirtualization),
     /// Multicast
-    Multicast,
+    Multicast(Multicast),
     /// Page Request Interface (PRI)
     PageRequestInterface(PageRequestInterface),
     /// Reserved for AMD
-    AmdReserved,
+    ReservedForAmd(ReservedForAmd),
     /// Resizable BAR
-    ResizableBar,
+    ResizableBar(ResizableBar),
     /// Dynamic Power Allocation (DPA)
-    DynamicPowerAllocation,
+    DynamicPowerAllocation(DynamicPowerAllocation),
     /// TPH Requester
     TphRequester(TphRequester<'a>),
     /// Latency Tolerance Reporting (LTR)
@@ -380,11 +397,11 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Secondary PCI Express
     SecondaryPciExpress(SecondaryPciExpress<'a>),
     /// Protocol Multiplexing (PMUX)
-    ProtocolMultiplexing,
+    ProtocolMultiplexing(ProtocolMultiplexing),
     /// Process Address Space ID (PASID)
     ProcessAddressSpaceId(ProcessAddressSpaceId),
     /// LN Requester (LNR)
-    LnRequester,
+    LnRequester(LnRequester),
     /// Downstream Port Containment (DPC)
     DownstreamPortContainment(DownstreamPortContainment),
     /// L1 PM Substates
@@ -392,31 +409,47 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Precision Time Measurement (PTM)
     PrecisionTimeMeasurement(PrecisionTimeMeasurement),
     /// PCI Express over M-PHY (M-PCIe)
-    PciExpressOverMphy,
+    PciExpressOverMphy(PciExpressOverMphy),
     /// FRS Queueing
-    FrsQueueing,
+    FrsQueueing(FrsQueueing),
     /// Readiness Time Reporting
-    ReadinessTimeReporting,
+    ReadinessTimeReporting(ReadinessTimeReporting),
     /// Designated Vendor-Specific Extended Capability
-    DesignatedVendorSpecificExtendedCapability,
+    DesignatedVendorSpecificExtendedCapability(DesignatedVendorSpecificExtendedCapability),
     /// VF Resizable BAR
-    VFResizableBar,
+    VfResizableBar(VfResizableBar),
     /// Data Link Feature
-    DataLinkFeature,
+    DataLinkFeature(DataLinkFeature),
     /// Physical Layer 16.0 GT/s
-    PhysicalLayer16GTps,
+    PhysicalLayer16GTps(PhysicalLayer16GTps),
     /// Lane Margining at the Receiver
-    ReceiverLaneMargining,
+    LaneMarginingAtTheReceiver(LaneMarginingAtTheReceiver),
     /// Hierarchy ID
-    HierarchyId,
+    HierarchyId(HierarchyId),
     /// Native PCIe Enclosure Management (NPEM)
-    NativePcieEnclosureManagement,
+    NativePcieEnclosureManagement(NativePcieEnclosureManagement),
     /// Physical Layer 32.0 GT/s
-    PhysicalLayer32GTps,
+    PhysicalLayer32GTps(PhysicalLayer32GTps),
     /// Alternate Protocol
-    AlternateProtocol,
+    AlternateProtocol(AlternateProtocol),
     /// System Firmware Intermediary (SFI)
-    SystemFirmwareIntermediary,
+    SystemFirmwareIntermediary(SystemFirmwareIntermediary),
+    /// Shadow Functions
+    ShadowFunctions(ShadowFunctions),
+    /// Data Object Exchange
+    DataObjectExchange(DataObjectExchange),
+    /// Device 3
+    Device3(Device3),
+    /// Integrity and Data Encryption (IDE)
+    IntegrityAndDataEncryption(IntegrityAndDataEncryption),
+    /// Physical Layer 64.0 GT/s
+    PhysicalLayer64GTps(PhysicalLayer64GTps),
+    /// Flit Logging
+    FlitLogging(FlitLogging),
+    /// Flit Performance Measurement
+    FlitPerformanceMeasurement(FlitPerformanceMeasurement),
+    /// Flit Error Injection
+    FlitErrorInjection(FlitErrorInjection),
     Reserved(u16),
 }
 
@@ -442,15 +475,44 @@ pub mod root_complex_link_declaration;
 pub use root_complex_link_declaration::RootComplexLinkDeclaration;
 
 // 0006h Root Complex Internal Link Control
+pub mod root_complex_internal_link_control {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct RootComplexInternalLinkControl;
+}
+pub use root_complex_internal_link_control::RootComplexInternalLinkControl;
+
 // 0007h Root Complex Event Collector Endpoint Association
+pub mod root_complex_event_collector_endpoint_association {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct RootComplexEventCollectorEndpointAssociation;
+}
+pub use root_complex_event_collector_endpoint_association::RootComplexEventCollectorEndpointAssociation;
+
 // 0008h Multi-Function Virtual Channel (MFVC)
+pub mod multifunction_virtual_channel {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct MultifunctionVirtualChannel;
+}
+pub use multifunction_virtual_channel::MultifunctionVirtualChannel;
+
 // 000Ah Root Complex Register Block (RCRB) Header
+pub mod root_complex_register_block_header {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct RootComplexRegisterBlockHeader;
+}
+pub use root_complex_register_block_header::RootComplexRegisterBlockHeader;
 
 // 000Bh Vendor-Specific Extended Capability (VSEC)
 pub mod vendor_specific_extended_capability;
 pub use vendor_specific_extended_capability::VendorSpecificExtendedCapability;
 
-// 000Ch Configuration Access Correlation (CAC) – defined by the Trusted Configuration Space (TCS) for PCI Express ECN, which is no longer supported
+// 000Ch Configuration Access Correlation (CAC)
+// defined by the Trusted Configuration Space (TCS) for PCI Express ECN, which is no longer supported
+pub mod configuration_access_correlation {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct ConfigurationAccessCorrelation;
+}
+pub use configuration_access_correlation::ConfigurationAccessCorrelation;
 
 // 000Dh Access Control Services (ACS)
 pub mod access_control_services;
@@ -468,16 +530,45 @@ pub use address_translation_services::AddressTranslationServices;
 pub mod single_root_io_virtualization;
 pub use single_root_io_virtualization::SingleRootIoVirtualization;
 
-// 0011h Multi-Root I/O Virtualization (MR-IOV) – defined in the Multi-Root I/O Virtualization and Sharing Specification
+// 0011h Multi-Root I/O Virtualization (MR-IOV)
+// defined in the Multi-Root I/O Virtualization and Sharing Specification
+pub mod multi_root_io_virtualization {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct MultiRootIoVirtualization;
+}
+pub use multi_root_io_virtualization::MultiRootIoVirtualization;
+
 // 0012h Multicast
+pub mod multicast {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Multicast;
+}
+pub use multicast::Multicast;
 
 // 0013h Page Request Interface (PRI)
 pub mod page_request_interface;
 pub use page_request_interface::PageRequestInterface;
 
 // 0014h Reserved for AMD
+pub mod reserved_for_amd {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct ReservedForAmd;
+}
+pub use reserved_for_amd::ReservedForAmd;
+
 // 0015h Resizable BAR
+pub mod resizable_bar {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct ResizableBar;
+}
+pub use resizable_bar::ResizableBar;
+
 // 0016h Dynamic Power Allocation (DPA)
+pub mod dynamic_power_allocation {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct DynamicPowerAllocation;
+}
+pub use dynamic_power_allocation::DynamicPowerAllocation;
 
 // 0017h TPH Requester
 pub mod tph_requester;
@@ -492,12 +583,22 @@ pub mod secondary_pci_express;
 pub use secondary_pci_express::SecondaryPciExpress;
 
 // 001Ah Protocol Multiplexing (PMUX)
+pub mod protocol_multiplexing {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct ProtocolMultiplexing;
+}
+pub use protocol_multiplexing::ProtocolMultiplexing;
 
 // 001Bh Process Address Space ID (PASID)
 pub mod process_address_space_id;
 pub use process_address_space_id::ProcessAddressSpaceId;
 
 // 001Ch LN Requester (LNR)
+pub mod ln_requester {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct LnRequester;
+}
+pub use ln_requester::LnRequester;
 
 // 001Dh Downstream Port Containment (DPC)
 pub mod downstream_port_containment;
@@ -512,20 +613,151 @@ pub mod precision_time_measurement;
 pub use precision_time_measurement::PrecisionTimeMeasurement;
 
 // 0020h PCI Express over M-PHY (M-PCIe)
+pub mod pci_express_over_m_phy {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct PciExpressOverMphy;
+}
+pub use pci_express_over_m_phy::PciExpressOverMphy;
+
 // 0021h FRS Queueing
+pub mod frs_queueing {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct FrsQueueing;
+}
+pub use frs_queueing::FrsQueueing;
+
 // 0022h Readiness Time Reporting
+pub mod readiness_time_reporting {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct ReadinessTimeReporting;
+}
+pub use readiness_time_reporting::ReadinessTimeReporting;
+
 // 0023h Designated Vendor-Specific Extended Capability
+pub mod designated_vendor_specific_extended_capability {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct DesignatedVendorSpecificExtendedCapability;
+}
+pub use designated_vendor_specific_extended_capability::DesignatedVendorSpecificExtendedCapability;
+
 // 0024h VF Resizable BAR
+pub mod vf_resizable_bar {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct VfResizableBar;
+}
+pub use vf_resizable_bar::VfResizableBar;
+
 // 0025h Data Link Feature
+pub mod data_link_feature {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct DataLinkFeature;
+}
+pub use data_link_feature::DataLinkFeature;
+
 // 0026h Physical Layer 16.0 GT/s
+pub mod physical_layer_16_gtps {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct PhysicalLayer16GTps;
+}
+pub use physical_layer_16_gtps::PhysicalLayer16GTps;
+
 // 0027h Lane Margining at the Receiver
+pub mod lane_margining_at_the_receiver {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct LaneMarginingAtTheReceiver;
+}
+pub use lane_margining_at_the_receiver::LaneMarginingAtTheReceiver;
+
 // 0028h Hierarchy ID
+pub mod hierarchy_id {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct HierarchyId;
+}
+pub use hierarchy_id::HierarchyId;
+
 // 0029h Native PCIe Enclosure Management (NPEM)
+pub mod native_pcie_enclosure_management {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct NativePcieEnclosureManagement;
+}
+pub use native_pcie_enclosure_management::NativePcieEnclosureManagement;
+
 // 002Ah Physical Layer 32.0 GT/s
+pub mod physical_layer_32_gtps {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct PhysicalLayer32GTps;
+}
+pub use physical_layer_32_gtps::PhysicalLayer32GTps;
+
 // 002Bh Alternate Protocol
+pub mod alternate_protocol {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct AlternateProtocol;
+}
+pub use alternate_protocol::AlternateProtocol;
+
 // 002Ch System Firmware Intermediary (SFI)
+pub mod system_firmware_intermediary {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct SystemFirmwareIntermediary;
+}
+pub use system_firmware_intermediary::SystemFirmwareIntermediary;
 
+// 002Dh Shadow Functions
+pub mod shadow_functions {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct ShadowFunctions;
+}
+pub use shadow_functions::ShadowFunctions;
 
+// 002Eh Data Object Exchange
+pub mod data_object_exchange {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct DataObjectExchange;
+}
+pub use data_object_exchange::DataObjectExchange;
+
+// 002Fh Device 3
+pub mod device_3 {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Device3;
+}
+pub use device_3::Device3;
+
+// 0030h Integrity and Data Encryption (IDE)
+pub mod integrity_and_data_encryption {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct IntegrityAndDataEncryption;
+}
+pub use integrity_and_data_encryption::IntegrityAndDataEncryption;
+
+// 0031h Physical Layer 64.0 GT/s
+pub mod physical_layer_64_gtps {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct PhysicalLayer64GTps;
+}
+pub use physical_layer_64_gtps::PhysicalLayer64GTps;
+
+// 0032h Flit Logging
+pub mod flit_logging {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct FlitLogging;
+}
+pub use flit_logging::FlitLogging;
+
+// 0033h Flit Performance Measurement
+pub mod flit_performance_measurement {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct FlitPerformanceMeasurement;
+}
+pub use flit_performance_measurement::FlitPerformanceMeasurement;
+
+// 0034h Flit Error Injection
+pub mod flit_error_injection {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct FlitErrorInjection;
+}
+pub use flit_error_injection::FlitErrorInjection;
 
 #[cfg(test)]
 mod tests {
