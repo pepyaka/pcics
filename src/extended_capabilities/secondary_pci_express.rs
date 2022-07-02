@@ -78,7 +78,7 @@ impl<'a> SecondaryPciExpress<'a> {
         link_width: LinkWidth,
     ) -> EqualizationControlLanes<'a> {
         // One Lane Equalization Control 2 bytes width
-        let end = link_width.value() * 2;
+        let end = (u8::from(link_width) as usize) * 2;
         EqualizationControlLanes::new(&self.ecl_data[..end])
     }
 }

@@ -750,20 +750,6 @@ pub enum LinkWidth {
     X16,
     X32,
 }
-impl LinkWidth {
-    pub fn value(&self) -> usize {
-        match self {
-            Self::X1  => 1,
-            Self::X2  => 2,
-            Self::X4  => 4,
-            Self::X8  => 8,
-            Self::X12 => 12,
-            Self::X16 => 16,
-            Self::X32 => 32,
-            Self::Reserved(_) => 0,
-        }
-    }
-}
 impl From<u8> for LinkWidth {
     fn from(byte: u8) -> Self {
         match byte {
@@ -783,11 +769,11 @@ impl From<LinkWidth> for u8 {
         match data {
             LinkWidth::X1  => 1,
             LinkWidth::X2  => 2,
-            LinkWidth::X4  => 3,
-            LinkWidth::X8  => 4,
-            LinkWidth::X12 => 5,
-            LinkWidth::X16 => 6,
-            LinkWidth::X32 => 7,
+            LinkWidth::X4  => 4,
+            LinkWidth::X8  => 8,
+            LinkWidth::X12 => 12,
+            LinkWidth::X16 => 16,
+            LinkWidth::X32 => 32,
             LinkWidth::Reserved(v) => v,
         }
     }

@@ -52,8 +52,10 @@ use crate::header::Header;
 
 #[derive(Snafu, Debug, Clone, PartialEq, Eq)]
 pub enum VendorSpecificError {
-    #[snafu(display("length should be > 0"))]
-    Length,
+    #[snafu(display("length byte is unreadable"))]
+    LengthUnreadable,
+    #[snafu(display("length should be > 2, not {val}"))]
+    Length { val: u8 },
     #[snafu(display("unable to get {size} bytes data"))]
     Data { size: usize },
     #[snafu(display("Virtio size shold be > 12"))]
@@ -72,9 +74,12 @@ impl<'a> VendorSpecific<'a> {
     pub fn try_new(slice: &'a [u8], header: &'a Header) -> Result<Self, VendorSpecificError> {
         let size: usize = slice
             .get(0)
+            .ok_or(VendorSpecificError::LengthUnreadable)
             // slice already without cap_id and next_ptr
-            .and_then(|l| l.checked_sub(2))
-            .ok_or(VendorSpecificError::Length)?
+            .and_then(|l| {
+                l.checked_sub(2)
+                    .ok_or(VendorSpecificError::Length { val: *l })
+            })?
             .into();
         let slice = slice
             .get(1..size)
@@ -86,6 +91,7 @@ impl<'a> VendorSpecific<'a> {
         Ok(result)
     }
 }
+
 
 
 
