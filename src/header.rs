@@ -86,7 +86,7 @@ mod command;
 pub use command::Command;
 
 mod status;
-use heterob::{endianness::Le, P11, P22, P17, Seq, P4};
+use heterob::{endianness::Le, P11, P22, P17, Seq, P4, bit_numbering::Lsb, P3};
 pub use status::{Status, DevselTiming};
 
 mod class_code;
@@ -759,20 +759,28 @@ impl From<IoAccessAddressRange > for [[u16;2]; 2] {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ExpansionRom {
     pub address: u32,
+    pub reserved: u16,
     pub is_enabled: bool,
 }
 
 impl From<u32> for ExpansionRom {
     fn from(dword: u32) -> Self {
+        let Lsb((
+            is_enabled,
+            reserved,
+            address,
+        )) = P3::<_, 1, 10, 21>(dword).into();
+        let _: u32 = address;
         Self {
-            address: dword & !0x7ff,
-            is_enabled: dword & 1 != 0,
+            is_enabled,
+            reserved,
+            address: address << 11,
         }
     }
 }
 impl From<ExpansionRom> for u32 {
     fn from(rom: ExpansionRom) -> Self {
-        rom.address | (rom.is_enabled as u32)
+        rom.address | (rom.reserved as u32) << 1 | (rom.is_enabled as u32)
     }
 }
 
