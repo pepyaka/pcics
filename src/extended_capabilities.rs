@@ -177,99 +177,153 @@ impl<'a> Iterator for ExtendedCapabilities<'a> {
 }
 
 type ExtendedCapabilityResult<'a> = Result<ExtendedCapability<'a>, ExtendedCapabilityError>;
-fn parse_ecap<'a>(bytes: &'a [u8], next_capability_offset: &mut u16) -> ExtendedCapabilityResult<'a> {
-        let offset = *next_capability_offset;
-        let ecs_offset = (offset as usize).checked_sub(ECS_OFFSET)
-            .ok_or_else(|| {
-                *next_capability_offset = 0;
-                ExtendedCapabilityError::Offset
-            })?;
-        let ecap_data_offset = ecs_offset + ECH_BYTES;
-        let dword = &bytes.get(ecs_offset .. ecap_data_offset)
-            // We can use unwrap on already length checked slice
-            .map(|slice| u32::from_le_bytes(slice.try_into().unwrap()))
-            .ok_or_else(|| {
-                *next_capability_offset = 0;
-                ExtendedCapabilityError::Header { offset }
-            })?;
-        if *dword == 0 {
-            return Err(ExtendedCapabilityError::EmptyHeader { offset });
-        }
-        let (id, version, next_cap_offset) = P3::<_, 16, 4, 12>(*dword).lsb_into();
-        *next_capability_offset = next_cap_offset;
 
-        let ecap_data = &bytes[ecap_data_offset..];
+fn parse_ecap<'a>(
+    bytes: &'a [u8],
+    next_capability_offset: &mut u16,
+) -> ExtendedCapabilityResult<'a> {
+    let offset = *next_capability_offset;
+    let ecs_offset = (offset as usize).checked_sub(ECS_OFFSET).ok_or_else(|| {
+        *next_capability_offset = 0;
+        ExtendedCapabilityError::Offset
+    })?;
+    let ecap_data_offset = ecs_offset + ECH_BYTES;
+    let dword = &bytes
+        .get(ecs_offset..ecap_data_offset)
+        // We can use unwrap on already length checked slice
+        .map(|slice| u32::from_le_bytes(slice.try_into().unwrap()))
+        .ok_or_else(|| {
+            *next_capability_offset = 0;
+            ExtendedCapabilityError::Header { offset }
+        })?;
+    if *dword == 0 {
+        return Err(ExtendedCapabilityError::EmptyHeader { offset });
+    }
+    let (id, version, next_cap_offset) = P3::<_, 16, 4, 12>(*dword).lsb_into();
+    *next_capability_offset = next_cap_offset;
 
-        use ExtendedCapabilityKind as Kind;
-        let kind = match id {
-            0x0000 => Kind::Null,
-            0x0001 => ecap_data.try_into().map(Kind::AdvancedErrorReporting)
-                        .context(AdvancedErrorReportingSnafu { offset })?,
-            0x0002 => ecap_data.try_into().map(Kind::VirtualChannel)
-                        .context(DataSnafu { offset })?,
-            0x0003 => ecap_data.try_into().map(Kind::DeviceSerialNumber)
-                        .context(DataSnafu { offset })?,
-            0x0004 => ecap_data.try_into().map(Kind::PowerBudgeting)
-                        .context(DataSnafu { offset })?,
-            0x0005 => ecap_data.try_into().map(Kind::RootComplexLinkDeclaration)
-                        .context(RootComplexLinkDeclarationSnafu { offset })?,
-            0x0006 => Kind::RootComplexInternalLinkControl(RootComplexInternalLinkControl),
-            0x0007 => Kind::RootComplexEventCollectorEndpointAssociation(RootComplexEventCollectorEndpointAssociation),
-            0x0008 => Kind::MultifunctionVirtualChannel(MultifunctionVirtualChannel),
-            0x0009 => ecap_data.try_into().map(Kind::VirtualChannelMfvcPresent)
-                        .context(DataSnafu { offset })?,
-            0x000A => Kind::RootComplexRegisterBlockHeader(RootComplexRegisterBlockHeader),
-            0x000B => ecap_data.try_into().map(Kind::VendorSpecificExtendedCapability)
-                        .context(DataSnafu { offset })?,
-            0x000C => Kind::ConfigurationAccessCorrelation(ConfigurationAccessCorrelation),
-            0x000D => ecap_data.try_into().map(Kind::AccessControlServices)
-                        .context(DataSnafu { offset })?,
-            0x000E => ecap_data.try_into().map(Kind::AlternativeRoutingIdInterpretation)
-                        .context(DataSnafu { offset })?,
-            0x000F => ecap_data.try_into().map(Kind::AddressTranslationServices)
-                        .context(DataSnafu { offset })?,
-            0x0010 => ecap_data.try_into().map(Kind::SingleRootIoVirtualization)
-                        .context(DataSnafu { offset })?,
-            0x0011 => Kind::MultiRootIoVirtualization(MultiRootIoVirtualization),
-            0x0012 => Kind::Multicast(Multicast),
-            0x0013 => ecap_data.try_into().map(Kind::PageRequestInterface)
-                        .context(DataSnafu { offset })?,
-            0x0014 => Kind::ReservedForAmd(ReservedForAmd),
-            0x0015 => Kind::ResizableBar(ResizableBar),
-            0x0016 => Kind::DynamicPowerAllocation(DynamicPowerAllocation),
-            0x0017 => ecap_data.try_into().map(Kind::TphRequester)
-                        .context(DataSnafu { offset })?,
-            0x0018 => ecap_data.try_into().map(Kind::LatencyToleranceReporting)
-                        .context(DataSnafu { offset })?,
-            0x0019 => ecap_data.try_into().map(Kind::SecondaryPciExpress)
-                        .context(DataSnafu { offset })?,
-            0x001A => Kind::ProtocolMultiplexing(ProtocolMultiplexing),
-            0x001B => ecap_data.try_into().map(Kind::ProcessAddressSpaceId)
-                        .context(DataSnafu { offset })?,
-            0x001C => Kind::LnRequester(LnRequester),
-            0x001D => ecap_data.try_into().map(Kind::DownstreamPortContainment)
-                        .context(DownstreamPortContainmentSnafu { offset })?,
-            0x001E => ecap_data.try_into().map(Kind::L1PmSubstates)
-                        .context(DataSnafu { offset })?,
-            0x001F => ecap_data.try_into().map(Kind::PrecisionTimeMeasurement)
-                        .context(DataSnafu { offset })?,
-            0x0020 => Kind::PciExpressOverMphy(PciExpressOverMphy),
-            0x0021 => Kind::FrsQueueing(FrsQueueing),
-            0x0022 => Kind::ReadinessTimeReporting(ReadinessTimeReporting),
-            0x0023 => Kind::DesignatedVendorSpecificExtendedCapability(DesignatedVendorSpecificExtendedCapability),
-            0x0024 => Kind::VfResizableBar(VfResizableBar),
-            0x0025 => Kind::DataLinkFeature(DataLinkFeature),
-            0x0026 => Kind::PhysicalLayer16GTps(PhysicalLayer16GTps),
-            0x0027 => Kind::LaneMarginingAtTheReceiver(LaneMarginingAtTheReceiver),
-            0x0028 => Kind::HierarchyId(HierarchyId),
-            0x0029 => Kind::NativePcieEnclosureManagement(NativePcieEnclosureManagement),
-            0x002A => Kind::PhysicalLayer32GTps(PhysicalLayer32GTps),
-            0x002B => Kind::AlternateProtocol(AlternateProtocol),
-            0x002C => Kind::SystemFirmwareIntermediary(SystemFirmwareIntermediary),
-                 v => Kind::Reserved(v),
-        };
-        Ok(ExtendedCapability { kind, version, offset })
+    let ecap_data = &bytes[ecap_data_offset..];
+
+    use ExtendedCapabilityKind as Kind;
+    let kind = match id {
+        0x0000 => Kind::Null,
+        0x0001 => ecap_data
+            .try_into()
+            .map(Kind::AdvancedErrorReporting)
+            .context(AdvancedErrorReportingSnafu { offset })?,
+        0x0002 => ecap_data
+            .try_into()
+            .map(Kind::VirtualChannel)
+            .context(DataSnafu { offset })?,
+        0x0003 => ecap_data
+            .try_into()
+            .map(Kind::DeviceSerialNumber)
+            .context(DataSnafu { offset })?,
+        0x0004 => ecap_data
+            .try_into()
+            .map(Kind::PowerBudgeting)
+            .context(DataSnafu { offset })?,
+        0x0005 => ecap_data
+            .try_into()
+            .map(Kind::RootComplexLinkDeclaration)
+            .context(RootComplexLinkDeclarationSnafu { offset })?,
+        0x0006 => ecap_data
+            .try_into()
+            .map(Kind::RootComplexInternalLinkControl)
+            .context(DataSnafu { offset })?,
+        0x0007 => Kind::RootComplexEventCollectorEndpointAssociation(
+            RootComplexEventCollectorEndpointAssociation,
+        ),
+        0x0008 => Kind::MultifunctionVirtualChannel(MultifunctionVirtualChannel),
+        0x0009 => ecap_data
+            .try_into()
+            .map(Kind::VirtualChannelMfvcPresent)
+            .context(DataSnafu { offset })?,
+        0x000A => Kind::RootComplexRegisterBlockHeader(RootComplexRegisterBlockHeader),
+        0x000B => ecap_data
+            .try_into()
+            .map(Kind::VendorSpecificExtendedCapability)
+            .context(DataSnafu { offset })?,
+        0x000C => Kind::ConfigurationAccessCorrelation(ConfigurationAccessCorrelation),
+        0x000D => ecap_data
+            .try_into()
+            .map(Kind::AccessControlServices)
+            .context(DataSnafu { offset })?,
+        0x000E => ecap_data
+            .try_into()
+            .map(Kind::AlternativeRoutingIdInterpretation)
+            .context(DataSnafu { offset })?,
+        0x000F => ecap_data
+            .try_into()
+            .map(Kind::AddressTranslationServices)
+            .context(DataSnafu { offset })?,
+        0x0010 => ecap_data
+            .try_into()
+            .map(Kind::SingleRootIoVirtualization)
+            .context(DataSnafu { offset })?,
+        0x0011 => Kind::MultiRootIoVirtualization(MultiRootIoVirtualization),
+        0x0012 => Kind::Multicast(Multicast),
+        0x0013 => ecap_data
+            .try_into()
+            .map(Kind::PageRequestInterface)
+            .context(DataSnafu { offset })?,
+        0x0014 => Kind::ReservedForAmd(ReservedForAmd),
+        0x0015 => Kind::ResizableBar(ResizableBar),
+        0x0016 => Kind::DynamicPowerAllocation(DynamicPowerAllocation),
+        0x0017 => ecap_data
+            .try_into()
+            .map(Kind::TphRequester)
+            .context(DataSnafu { offset })?,
+        0x0018 => ecap_data
+            .try_into()
+            .map(Kind::LatencyToleranceReporting)
+            .context(DataSnafu { offset })?,
+        0x0019 => ecap_data
+            .try_into()
+            .map(Kind::SecondaryPciExpress)
+            .context(DataSnafu { offset })?,
+        0x001A => Kind::ProtocolMultiplexing(ProtocolMultiplexing),
+        0x001B => ecap_data
+            .try_into()
+            .map(Kind::ProcessAddressSpaceId)
+            .context(DataSnafu { offset })?,
+        0x001C => Kind::LnRequester(LnRequester),
+        0x001D => ecap_data
+            .try_into()
+            .map(Kind::DownstreamPortContainment)
+            .context(DownstreamPortContainmentSnafu { offset })?,
+        0x001E => ecap_data
+            .try_into()
+            .map(Kind::L1PmSubstates)
+            .context(DataSnafu { offset })?,
+        0x001F => ecap_data
+            .try_into()
+            .map(Kind::PrecisionTimeMeasurement)
+            .context(DataSnafu { offset })?,
+        0x0020 => Kind::PciExpressOverMphy(PciExpressOverMphy),
+        0x0021 => Kind::FrsQueueing(FrsQueueing),
+        0x0022 => Kind::ReadinessTimeReporting(ReadinessTimeReporting),
+        0x0023 => Kind::DesignatedVendorSpecificExtendedCapability(
+            DesignatedVendorSpecificExtendedCapability,
+        ),
+        0x0024 => Kind::VfResizableBar(VfResizableBar),
+        0x0025 => Kind::DataLinkFeature(DataLinkFeature),
+        0x0026 => Kind::PhysicalLayer16GTps(PhysicalLayer16GTps),
+        0x0027 => Kind::LaneMarginingAtTheReceiver(LaneMarginingAtTheReceiver),
+        0x0028 => Kind::HierarchyId(HierarchyId),
+        0x0029 => Kind::NativePcieEnclosureManagement(NativePcieEnclosureManagement),
+        0x002A => Kind::PhysicalLayer32GTps(PhysicalLayer32GTps),
+        0x002B => Kind::AlternateProtocol(AlternateProtocol),
+        0x002C => Kind::SystemFirmwareIntermediary(SystemFirmwareIntermediary),
+        v => Kind::Reserved(v),
+    };
+    Ok(ExtendedCapability {
+        kind,
+        version,
+        offset,
+    })
 }
+
 
 /// Extended Capability
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -475,10 +529,7 @@ pub mod root_complex_link_declaration;
 pub use root_complex_link_declaration::RootComplexLinkDeclaration;
 
 // 0006h Root Complex Internal Link Control
-pub mod root_complex_internal_link_control {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct RootComplexInternalLinkControl;
-}
+pub mod root_complex_internal_link_control;
 pub use root_complex_internal_link_control::RootComplexInternalLinkControl;
 
 // 0007h Root Complex Event Collector Endpoint Association
