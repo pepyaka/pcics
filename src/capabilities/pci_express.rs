@@ -27,18 +27,210 @@ Register implementation depends on Device/Port Type. Required implementation des
 are not required.  PCI/PCI-X to PCI Express Bridges (Reverse Bridges) also permitted to implement
 these registers.
 
-*/
+## Struct diagram
+<pre>
+<a href="struct.PciExpress.html">PciExpress</a>
+├─ <a href="enum.DeviceType.html">DeviceType</a>
+│  ├─ <a href="struct.Link.html">Link</a>
+│  │  ├─ <a href="struct.LinkCapabilities.html">LinkCapabilities</a>
+│  │  │  ├─ <a href="enum.LinkSpeed.html">LinkSpeed</a>
+│  │  │  ├─ <a href="enum.LinkWidth.html">LinkWidth</a>
+│  │  │  ├─ <a href="enum.ActiveStatePowerManagement.html">ActiveStatePowerManagement</a>
+│  │  │  ├─ <a href="enum.L0sExitLatency.html">L0sExitLatency</a>
+│  │  │  └─ <a href="enum.L1ExitLatency.html">L1ExitLatency</a>
+│  │  ├─ <a href="struct.LinkControl.html">LinkControl</a>
+│  │  │  ├─ <a href="enum.ActiveStatePowerManagement.html">ActiveStatePowerManagement</a>
+│  │  │  └─ <a href="enum.ReadCompletionBoundary.html">ReadCompletionBoundary</a>
+│  │  └─ <a href="struct.LinkStatus.html">LinkStatus</a>
+│  │     ├─ <a href="enum.LinkSpeed.html">LinkSpeed</a>
+│  │     └─ <a href="enum.LinkWidth.html">LinkWidth</a>
+│  ├─ <a href="struct.Slot.html">Slot</a>
+│  │  ├─ <a href="struct.SlotCapabilities.html">SlotCapabilities</a>
+│  │  │  └─ <a href="struct.SlotPowerLimit.html">SlotPowerLimit</a>
+│  │  ├─ <a href="struct.SlotControl.html">SlotControl</a>
+│  │  │  └─ <a href="enum.IndicatorControl.html">2 x IndicatorControl</a>
+│  │  └─ <a href="struct.SlotStatus.html">SlotStatus</a>
+│  ├─ <a href="struct.Root.html">Root</a>
+│  │  ├─ <a href="struct.RootControl.html">RootControl</a>
+│  │  ├─ <a href="struct.RootCapabilities.html">RootCapabilities</a>
+│  │  └─ <a href="struct.RootStatus.html">RootStatus</a>
+│  ├─ <a href="struct.Link2.html">Link2</a>
+│  │  ├─ <a href="struct.LinkCapabilities2.html">LinkCapabilities2</a>
+│  │  │  └─ <a href="struct.SupportedLinkSpeedsVector.html">3 x SupportedLinkSpeedsVector</a>
+│  │  ├─ <a href="struct.LinkControl2.html">LinkControl2</a>
+│  │  │  ├─ <a href="enum.LinkSpeed.html">LinkSpeed</a>
+│  │  │  ├─ <a href="enum.DeEmphasis.html">DeEmphasis</a>
+│  │  │  ├─ <a href="struct.TransmitMargin.html">TransmitMargin</a>
+│  │  │  └─ <a href="struct.CompliancePresetOrDeEmphasis.html">CompliancePresetOrDeEmphasis</a>
+│  │  └─ <a href="struct.LinkStatus2.html">LinkStatus2</a>
+│  │     ├─ <a href="enum.DeEmphasis.html">DeEmphasis</a>
+│  │     ├─ <a href="enum.CrosslinkResolution.html">CrosslinkResolution</a>
+│  │     └─ <a href="enum.DownstreamComponentPresence.html">DownstreamComponentPresence</a>
+│  └─ <a href="struct.Slot2.html">Slot2</a>
+│     ├─ <a href="struct.SlotCapabilities2.html">SlotCapabilities2</a>
+│     ├─ <a href="struct.SlotControl2.html">SlotControl2</a>
+│     └─ <a href="struct.SlotStatus2.html">SlotStatus2</a>
+├─ <a href="struct.Device.html">Device</a>
+│  ├─ <a href="struct.DeviceCapabilities.html">DeviceCapabilities</a>
+│  │  ├─ <a href="enum.MaxSize.html">MaxSize</a>
+│  │  ├─ <a href="enum.PhantomFunctionsSupported.html">PhantomFunctionsSupported</a>
+│  │  ├─ <a href="enum.ExtendedTagFieldSupported.html">ExtendedTagFieldSupported</a>
+│  │  ├─ <a href="enum.EndpointL0sAcceptableLatency.html">EndpointL0sAcceptableLatency</a>
+│  │  ├─ <a href="enum.EndpointL1AcceptableLatency.html">EndpointL1AcceptableLatency</a>
+│  │  └─ <a href="struct.SlotPowerLimit.html">SlotPowerLimit</a>
+│  ├─ <a href="struct.DeviceControl.html">DeviceControl</a>
+│  │  └─ <a href="enum.MaxSize.html">2 x MaxSize</a>
+│  └─ <a href="struct.DeviceStatus.html">DeviceControl</a>
+└─ <a href="struct.Device2.html">Device2</a>
+   ├─ <a href="struct.DeviceCapabilities2.html">DeviceCapabilities2</a>
+   │  ├─ <a href="enum.CompletionTimeoutRanges.html">CompletionTimeoutRanges</a>
+   │  ├─ <a href="enum.TphCompleter.html">TphCompleter</a>
+   │  ├─ <a href="enum.LnSystemCls.html">LnSystemCls</a>
+   │  ├─ <a href="enum.Obff.html">Obff</a>
+   │  ├─ <a href="enum.MaxEndEndTlpPrefixes.html">MaxEndEndTlpPrefixes</a>
+   │  └─ <a href="enum.EmergencyPowerReduction.html">EmergencyPowerReduction</a>
+   ├─ <a href="struct.DeviceControl2.html">DeviceControl2</a>
+   │  ├─ <a href="enum.CompletionTimeoutValue.html">CompletionTimeoutValue</a>
+   │  ├─ <a href="enum.ObffEnable.html">ObffEnable</a>
+   │  └─ <a href="enum.EndEndTlpPrefixBlocking.html">EndEndTlpPrefixBlocking</a>
+   └─ <a href="struct.DeviceStatus2.html">DeviceStatus2</a>
+</pre>
 
+## Examples
+> ```plaintext
+> Express (v1) Upstream Port, MSI 00
+>   DevCap: MaxPayload 2048 bytes, PhantFunc 0
+>           ExtTag+ AttnBtn- AttnInd- PwrInd- RBE+ SlotPowerLimit 75.000W
+>   DevCtl: CorrErr- NonFatalErr- FatalErr- UnsupReq-
+>           RlxdOrd- ExtTag+ PhantFunc- AuxPwr- NoSnoop-
+>           MaxPayload 256 bytes, MaxReadReq 128 bytes
+>   DevSta: CorrErr+ NonFatalErr- FatalErr- UnsupReq+ AuxPwr- TransPend-
+>   LnkCap: Port #0, Speed 2.5GT/s, Width x4, ASPM L0s L1, Exit Latency L0s <512ns, L1 <4us
+>           ClockPM- Surprise- LLActRep- BwNot- ASPMOptComp-
+>   LnkCtl: ASPM Disabled; Disabled- CommClk+
+>           ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+>   LnkSta: Speed 2.5GT/s (ok), Width x4 (ok)
+>           TrErr- Train- SlotClk+ DLActive- BWMgmt- ABWMgmt-
+> ```
+
+```rust
+use pretty_assertions::assert_eq;
+# use pcics::capabilities::pci_express::*;
+let data = [
+    0x10, 0xc0, // Header
+    0x51, 0x40, // PCI Express Capabilities
+    0x24, 0x80, 0x2c, 0x01, // Device Capabilities
+    0x20, 0x01, // Device Control
+    0x09, 0x00, // Device Status
+    0x41, 0x3c, 0x01, 0x00, // Link Capabilities
+    0x40, 0x00, // Link Control
+    0x41, 0x10, // Link Status
+    0x00, 0x00, 0x00, 0x00, // Slot Capabilities
+    0x00, 0x00, // Slot Control
+    0x00, 0x00, // Slot Status
+];
+let result = data[2..].try_into().unwrap();
+let sample = PciExpress {
+    version: 1,
+    device_type: DeviceType::UpstreamPort {
+        link: Link {
+            capabilities: LinkCapabilities {
+                max_link_speed: LinkSpeed::Rate2GTps,
+                maximum_link_width: LinkWidth::X4,
+                active_state_power_management_support: ActiveStatePowerManagement::L0sAndL1,
+                l0s_exit_latency: L0sExitLatency::Ge256nsAndLt512ns,
+                l1_exit_latency: L1ExitLatency::Ge2usAndLt4us,
+                clock_power_management: false,
+                surprise_down_error_reporting_capable: false,
+                data_link_layer_link_active_reporting_capable: false,
+                link_bandwidth_notification_capability: false,
+                aspm_optionality_compliance: false,
+                port_number: 0,
+            },
+            control: LinkControl {
+                active_state_power_management_control: ActiveStatePowerManagement::NoAspm,
+                read_completion_boundary: ReadCompletionBoundary::B64,
+                link_disable: false,
+                retrain_link: false,
+                common_clock_configuration: true,
+                extended_synch: false,
+                enable_clock_power_management: false,
+                hardware_autonomous_width_disable: false,
+                link_bandwidth_management_interrupt_enable: false,
+                link_autonomous_bandwidth_interrupt_enable: false,
+            },
+            status: LinkStatus {
+                current_link_speed: LinkSpeed::Rate2GTps,
+                negotiated_link_width: LinkWidth::X4,
+                link_training_error: false,
+                link_training: false,
+                slot_clock_configuration: true,
+                data_link_layer_link_active: false,
+                link_bandwidth_management_status: false,
+                link_autonomous_bandwidth_status: false,
+            },
+        },
+        link_2: None,
+    },
+    slot_implemented: false,
+    interrupt_message_number: 0,
+    tcs_routing_support: true,
+    device: Device {
+        capabilities: DeviceCapabilities {
+            max_payload_size_supported: MaxSize::B2048,
+            phantom_functions_supported: PhantomFunctionsSupported::NoBits,
+            extended_tag_field_supported: ExtendedTagFieldSupported::Eight,
+            endpoint_l0s_acceptable_latency: EndpointL0sAcceptableLatency::Max64ns,
+            endpoint_l1_acceptable_latency: EndpointL1AcceptableLatency::Max1us,
+            attention_button_present: false,
+            attention_indicator_present: false,
+            power_indicator_present: false,
+            role_based_error_reporting: true,
+            captured_slot_power_limit: SlotPowerLimit {
+                value: 75,
+                scale: 1.0,
+            },
+            function_level_reset_capability: false,
+        },
+        control: DeviceControl {
+            correctable_error_reporting_enable: false,
+            non_fatal_error_reporting_enable: false,
+            fatal_error_reporting_enable: false,
+            unsupported_request_reporting_enable: false,
+            enable_relaxed_ordering: false,
+            max_payload_size: MaxSize::B256,
+            extended_tag_field_enable: true,
+            phantom_functions_enable: false,
+            aux_power_pm_enable: false,
+            enable_no_snoop: false,
+            max_read_request_size: MaxSize::B128,
+            bcre_or_flreset: false,
+        },
+        status: DeviceStatus {
+            correctable_error_detected: true,
+            non_fatal_error_detected: false,
+            fatal_error_detected: false,
+            unsupported_request_detected: true,
+            aux_power_detected: false,
+            transactions_pending: false,
+        },
+    },
+    device_2: None,
+};
+assert_eq!(sample, result);
+```
+*/
 
 use core::ops::Range;
 
-use heterob::{P6,P3, endianness::Le, bit_numbering::LsbInto, P12, P14, P7, P8, P10, P2, P4, P21, P9};
+use heterob::{
+    bit_numbering::LsbInto, endianness::Le, P10, P12, P14, P2, P21, P3, P4, P6, P7, P8, P9,
+};
 use snafu::prelude::*;
-
 
 #[derive(Snafu, Debug, Clone, PartialEq, Eq)]
 pub enum PciExpressError {
-    #[snafu(display("can't read required bytes from slice"))]
+    #[snafu(display("can't read mandatory (0x1a) bytes from slice"))]
     RequiredBytesSlice,
     #[snafu(display("can't read root bytes from slice"))]
     RootBytesSlice,
@@ -69,17 +261,29 @@ impl<'a> TryFrom<&'a [u8]> for PciExpress {
         // The PCI Express Capabilities, Device Capabilities, Device Status, and Device Control
         // registers are required for all PCI Express device Functions
         let (start, end) = (0, 26);
-        let required_bytes = slice.get(start..end)
+        let required_bytes = slice
+            .get(start..end)
             .and_then(|slice| <[u8; 26]>::try_from(slice).ok())
             .ok_or(PciExpressError::RequiredBytesSlice)?;
-        let Le((caps,
-                dev_caps, dev_ctrl, dev_st,
-                link_caps, link_ctrl, link_st,
-                slot_caps, slot_ctrl, slot_st,
-            )) = P10(required_bytes).into();
+        let Le((
+            caps,
+            dev_caps,
+            dev_ctrl,
+            dev_st,
+            link_caps,
+            link_ctrl,
+            link_st,
+            slot_caps,
+            slot_ctrl,
+            slot_st,
+        )) = P10(required_bytes).into();
         let (
-            version, device_type, slot_implemented,
-            interrupt_message_number, tcs_routing_support, ()
+            version,
+            device_type,
+            slot_implemented,
+            interrupt_message_number,
+            tcs_routing_support,
+            (),
         ) = P6::<u16, 4, 4, 1, 5, 1, 1>(caps).lsb_into();
         let device = Device::new(dev_caps, dev_ctrl, dev_st);
         let link = Link::new(link_caps, link_ctrl, link_st);
@@ -87,49 +291,49 @@ impl<'a> TryFrom<&'a [u8]> for PciExpress {
 
         // Root Capabilities, Root Status, and Root Control
         let (start, end) = (end, end + 8);
-        let root = slice.get(start..end)
-            .and_then(|slice| {
-                let bytes = <[u8; 8]>::try_from(slice).ok()?;
-                let Le((root_ctrl, root_caps, root_st)) = P3(bytes).into();
-                Some(Root::new(root_ctrl, root_caps, root_st))
-            });
+        let root = slice.get(start..end).and_then(|slice| {
+            let bytes = <[u8; 8]>::try_from(slice).ok()?;
+            let Le((root_ctrl, root_caps, root_st)) = P3(bytes).into();
+            Some(Root::new(root_ctrl, root_caps, root_st))
+        });
 
-        let (device_2, link_2, slot_2) =
-            if version > 1 {
-                // Device Capabilities 2, Device Status 2, and Device Control 2
-                let (start, end) = (end, end + 8);
-                let device_2 = slice.get(start..end)
-                    .and_then(|slice| {
-                        let bytes = <[u8; 8]>::try_from(slice).ok()?;
-                        let Le((dev_ctrl, dev_caps, dev_st)) = P3(bytes).into();
-                        Some(Device2::new(dev_ctrl, dev_caps, dev_st))
-                    });
-                // Link Capabilities 2, Link Status 2, and Link Control 2
-                let (start, end) = (end, end + 8);
-                let link_2 = slice.get(start..end)
-                    .and_then(|slice| {
-                        let bytes = <[u8; 8]>::try_from(slice).ok()?;
-                        let Le((link_caps_2, link_ctrl_2, link_st_2)) = P3(bytes).into();
-                        Some(Link2::new(link_caps_2, link_ctrl_2, link_st_2))
-                    });
-                // Slot Capabilities 2, Slot Status 2, and Slot Control 2
-                let (start, end) = (end, end + 8);
-                let slot_2 = slice.get(start..end)
-                    .and_then(|slice| {
-                        let bytes = <[u8; 8]>::try_from(slice).ok()?;
-                        let Le((slot_caps_2, slot_ctrl_2, slot_st_2)) = P3(bytes).into();
-                        Some(Slot2::new(slot_caps_2, slot_ctrl_2, slot_st_2))
-                    });
-                (device_2, link_2, slot_2)
-            } else {
-                (None, None, None)
-            };
+        let (device_2, link_2, slot_2) = if version > 1 {
+            // Device Capabilities 2, Device Status 2, and Device Control 2
+            let (start, end) = (end, end + 8);
+            let device_2 = slice.get(start..end).and_then(|slice| {
+                let bytes = <[u8; 8]>::try_from(slice).ok()?;
+                let Le((dev_ctrl, dev_caps, dev_st)) = P3(bytes).into();
+                Some(Device2::new(dev_ctrl, dev_caps, dev_st))
+            });
+            // Link Capabilities 2, Link Status 2, and Link Control 2
+            let (start, end) = (end, end + 8);
+            let link_2 = slice.get(start..end).and_then(|slice| {
+                let bytes = <[u8; 8]>::try_from(slice).ok()?;
+                let Le((link_caps_2, link_ctrl_2, link_st_2)) = P3(bytes).into();
+                Some(Link2::new(link_caps_2, link_ctrl_2, link_st_2))
+            });
+            // Slot Capabilities 2, Slot Status 2, and Slot Control 2
+            let (start, end) = (end, end + 8);
+            let slot_2 = slice.get(start..end).and_then(|slice| {
+                let bytes = <[u8; 8]>::try_from(slice).ok()?;
+                let Le((slot_caps_2, slot_ctrl_2, slot_st_2)) = P3(bytes).into();
+                Some(Slot2::new(slot_caps_2, slot_ctrl_2, slot_st_2))
+            });
+            (device_2, link_2, slot_2)
+        } else {
+            (None, None, None)
+        };
 
         let device_type_args = (device_type, link, slot, root, link_2, slot_2);
         let device_type = DeviceType::try_from(device_type_args)?;
         Ok(Self {
-            version, device_type, slot_implemented, interrupt_message_number,
-            tcs_routing_support, device, device_2,
+            version,
+            device_type,
+            slot_implemented,
+            interrupt_message_number,
+            tcs_routing_support,
+            device,
+            device_2,
         })
     }
 }
@@ -140,21 +344,13 @@ type DeviceTypeArgs = (u8, Link, Slot, Option<Root>, Option<Link2>, Option<Slot2
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeviceType {
     /// PCI Express Endpoint
-    Endpoint {
-        link: Link,
-        link_2: Option<Link2>,
-    },
+    Endpoint { link: Link, link_2: Option<Link2> },
     /// Legacy PCI Express Endpoint
-    LegacyEndpoint {
-        link: Link,
-        link_2: Option<Link2>,
-    },
+    LegacyEndpoint { link: Link, link_2: Option<Link2> },
     /// Root Complex Integrated Endpoint
     RootComplexIntegratedEndpoint,
     /// Root Complex Event Collector
-    RootComplexEventCollector {
-        root: Root,
-    },
+    RootComplexEventCollector { root: Root },
     /// Root Port of PCI Express Root Complex
     RootPort {
         link: Link,
@@ -164,10 +360,7 @@ pub enum DeviceType {
         root: Root,
     },
     /// Upstream Port of PCI Express Switch
-    UpstreamPort {
-        link: Link,
-        link_2: Option<Link2>,
-    },
+    UpstreamPort { link: Link, link_2: Option<Link2> },
     /// Downstream Port of PCI Express Switch
     DownstreamPort {
         link: Link,
@@ -176,10 +369,7 @@ pub enum DeviceType {
         slot_2: Option<Slot2>,
     },
     /// PCI Express to PCI/PCI-X Bridge
-    PcieToPciBridge {
-        link: Link,
-        link_2: Option<Link2>,
-    },
+    PcieToPciBridge { link: Link, link_2: Option<Link2> },
     /// PCI/PCI-X to PCI Express Bridge
     PciToPcieBridge {
         link: Link,
@@ -199,20 +389,25 @@ pub enum DeviceType {
 }
 impl DeviceType {
     pub fn is_endpoint(&self) -> bool {
-        matches!(self,
-            Self::Endpoint { .. } | Self::LegacyEndpoint { .. } | Self::RootComplexIntegratedEndpoint
+        matches!(
+            self,
+            Self::Endpoint { .. }
+                | Self::LegacyEndpoint { .. }
+                | Self::RootComplexIntegratedEndpoint
         )
     }
     pub fn is_root(&self) -> bool {
-        matches!(self,
+        matches!(
+            self,
             DeviceType::RootPort { .. } | DeviceType::RootComplexEventCollector { .. }
         )
     }
     pub fn is_downstream_port(&self) -> bool {
-        matches!(self,
-            DeviceType::RootPort { .. } |
-            DeviceType::DownstreamPort { .. } |
-            DeviceType::PciToPcieBridge { .. }
+        matches!(
+            self,
+            DeviceType::RootPort { .. }
+                | DeviceType::DownstreamPort { .. }
+                | DeviceType::PciToPcieBridge { .. }
         )
     }
 }
@@ -222,22 +417,49 @@ impl TryFrom<DeviceTypeArgs> for DeviceType {
     fn try_from(args: DeviceTypeArgs) -> Result<Self, Self::Error> {
         let (device_type, link, slot, root, link_2, slot_2) = args;
         match (device_type, root) {
-            (0b0000, _) => Ok(Self::Endpoint { link, link_2, }),
-            (0b0001, _) => Ok(Self::LegacyEndpoint { link, link_2, }),
+            (0b0000, _) => Ok(Self::Endpoint { link, link_2 }),
+            (0b0001, _) => Ok(Self::LegacyEndpoint { link, link_2 }),
             (0b1001, _) => Ok(Self::RootComplexIntegratedEndpoint),
-            (0b1010, Some(root)) => Ok(Self::RootComplexEventCollector { root, }),
+            (0b1010, Some(root)) => Ok(Self::RootComplexEventCollector { root }),
             (0b1010, None) => Err(PciExpressError::RootBytesSlice),
-            (0b0100, Some(root)) => Ok(Self::RootPort { link, link_2, slot, slot_2, root, }),
+            (0b0100, Some(root)) => Ok(Self::RootPort {
+                link,
+                link_2,
+                slot,
+                slot_2,
+                root,
+            }),
             (0b0100, None) => Err(PciExpressError::RootBytesSlice),
-            (0b0101, _) => Ok(Self::UpstreamPort { link, link_2, }),
-            (0b0110, _) => Ok(Self::DownstreamPort { link, link_2, slot, slot_2, }),
-            (0b0111, _) => Ok(Self::PcieToPciBridge { link, link_2, }),
-            (0b1000, _) => Ok(Self::PciToPcieBridge { link, link_2, slot, slot_2, }),
-            (id, Some(root)) =>
-                Ok(Self::Reserved { id, link, link_2, slot, slot_2, root: Some(root), }),
-            (id, None) =>
-                Ok(Self::Reserved { id, link, link_2, slot, slot_2, root: None, }),
-
+            (0b0101, _) => Ok(Self::UpstreamPort { link, link_2 }),
+            (0b0110, _) => Ok(Self::DownstreamPort {
+                link,
+                link_2,
+                slot,
+                slot_2,
+            }),
+            (0b0111, _) => Ok(Self::PcieToPciBridge { link, link_2 }),
+            (0b1000, _) => Ok(Self::PciToPcieBridge {
+                link,
+                link_2,
+                slot,
+                slot_2,
+            }),
+            (id, Some(root)) => Ok(Self::Reserved {
+                id,
+                link,
+                link_2,
+                slot,
+                slot_2,
+                root: Some(root),
+            }),
+            (id, None) => Ok(Self::Reserved {
+                id,
+                link,
+                link_2,
+                slot,
+                slot_2,
+                root: None,
+            }),
         }
     }
 }
@@ -259,7 +481,6 @@ impl Device {
         }
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeviceCapabilities {
@@ -290,16 +511,21 @@ pub struct DeviceCapabilities {
 impl From<u32> for DeviceCapabilities {
     fn from(dword: u32) -> Self {
         let (
-            mpss, phfs, etfs, l0s_lat, l1_lat,
+            mpss,
+            phfs,
+            etfs,
+            l0s_lat,
+            l1_lat,
             attention_button_present,
             attention_indicator_present,
             power_indicator_present,
             role_based_error_reporting,
             (),
-            cspl_value, cspl_scale,
+            cspl_value,
+            cspl_scale,
             function_level_reset_capability,
             (),
-        ) = P14::<_, 3,2,1,3,3,1,1,1,1,2,8,2,1,3>(dword).lsb_into();
+        ) = P14::<_, 3, 2, 1, 3, 3, 1, 1, 1, 1, 2, 8, 2, 1, 3>(dword).lsb_into();
         Self {
             max_payload_size_supported: From::<u8>::from(mpss),
             phantom_functions_supported: From::<u8>::from(phfs),
@@ -315,7 +541,6 @@ impl From<u32> for DeviceCapabilities {
         }
     }
 }
-
 
 /// Max_Payload_Size Supported / Max_Payload_Size / Max_Read_Request_Size
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -348,7 +573,7 @@ impl From<u8> for MaxSize {
             0b101 => Self::B4096,
             0b110 => Self::Reserved0,
             0b111 => Self::Reserved1,
-                _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
@@ -375,11 +600,10 @@ impl From<u8> for PhantomFunctionsSupported {
             0b01 => Self::MostSignificantBit,
             0b10 => Self::TwoMostSignificantBits,
             0b11 => Self::AllBits,
-               _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
-
 
 /// Maximum supported size of the Tag field as a Requester
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -431,7 +655,7 @@ impl From<u8> for EndpointL0sAcceptableLatency {
             0b101 => Self::Max2us,
             0b110 => Self::Max4us,
             0b111 => Self::NoLimit,
-                _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
@@ -468,11 +692,10 @@ impl From<u8> for EndpointL1AcceptableLatency {
             0b101 => Self::Max32us,
             0b110 => Self::Max64us,
             0b111 => Self::NoLimit,
-                _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
-
 
 /// Slot Power Limit (Captured)
 /// Specifies the upper limit on power available/supplied to the adapter
@@ -489,8 +712,11 @@ impl SlotPowerLimit {
             0b00 => SlotPowerLimit { value, scale: 1.0 },
             0b01 => SlotPowerLimit { value, scale: 0.1 },
             0b10 => SlotPowerLimit { value, scale: 0.01 },
-            0b11 => SlotPowerLimit { value, scale: 0.001 },
-               _ => unreachable!(),
+            0b11 => SlotPowerLimit {
+                value,
+                scale: 0.001,
+            },
+            _ => unreachable!(),
         }
     }
 }
@@ -505,7 +731,6 @@ impl<'a> From<&'a SlotPowerLimit> for f32 {
         cspl.scale * cspl.value as f32
     }
 }
-
 
 /// The Device Control register controls PCI Express device specific parameters
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -554,7 +779,7 @@ impl From<u16> for DeviceControl {
             enable_no_snoop,
             mrrs,
             bcre_or_flreset,
-        ) = P12::<_, 1,1,1,1,1,3,1,1,1,1,3,1>(word).lsb_into();
+        ) = P12::<_, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 3, 1>(word).lsb_into();
         Self {
             correctable_error_reporting_enable,
             non_fatal_error_reporting_enable,
@@ -571,7 +796,6 @@ impl From<u16> for DeviceControl {
         }
     }
 }
-
 
 /// Provides information about PCI Express device (Function) specific parameters
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -604,7 +828,7 @@ impl From<u16> for DeviceStatus {
             aux_power_detected,
             transactions_pending,
             (),
-        ) = P7::<_, 1,1,1,1,1,1,10>(word).lsb_into();
+        ) = P7::<_, 1, 1, 1, 1, 1, 1, 10>(word).lsb_into();
         Self {
             correctable_error_detected,
             non_fatal_error_detected,
@@ -615,7 +839,6 @@ impl From<u16> for DeviceStatus {
         }
     }
 }
-
 
 /// The Link Capabilities, Link Status, and Link Control registers are required for all Root Ports,
 /// Switch Ports, Bridges, and Endpoints that are not Root Complex Integrated Endpoints
@@ -634,7 +857,6 @@ impl Link {
         }
     }
 }
-
 
 /// The Link Capabilities register identifies PCI Express Link specific capabilities
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -661,7 +883,11 @@ pub struct LinkCapabilities {
 impl From<u32> for LinkCapabilities {
     fn from(dword: u32) -> Self {
         let (
-            mls, mlw, aspms, l0s_lat, l1_lat,
+            mls,
+            mlw,
+            aspms,
+            l0s_lat,
+            l1_lat,
             clock_power_management,
             surprise_down_error_reporting_capable,
             data_link_layer_link_active_reporting_capable,
@@ -669,7 +895,7 @@ impl From<u32> for LinkCapabilities {
             aspm_optionality_compliance,
             (),
             port_number,
-        ) = P12::<_, 4,6,2,3,3,1,1,1,1,1,1,8>(dword).lsb_into();
+        ) = P12::<_, 4, 6, 2, 3, 3, 1, 1, 1, 1, 1, 1, 8>(dword).lsb_into();
         Self {
             max_link_speed: From::<u8>::from(mls),
             maximum_link_width: From::<u8>::from(mlw),
@@ -685,7 +911,6 @@ impl From<u32> for LinkCapabilities {
         }
     }
 }
-
 
 /// Max/Current/Target Link Speed
 /// Speeds should be taken from [SupportedLinkSpeedsVector]
@@ -718,25 +943,24 @@ impl From<u8> for LinkSpeed {
             0b0101 => Self::Rate32GTps,
             0b0110 => Self::Rate64GTps,
             0b0111 => Self::RateRsvdp,
-                 v => Self::Reserved(v),
+            v => Self::Reserved(v),
         }
     }
 }
 impl From<LinkSpeed> for u8 {
     fn from(data: LinkSpeed) -> Self {
         match data {
-            LinkSpeed::Rate2GTps   => 1,
-            LinkSpeed::Rate5GTps   => 2,
-            LinkSpeed::Rate8GTps   => 3,
-            LinkSpeed::Rate16GTps  => 4,
-            LinkSpeed::Rate32GTps  => 5,
-            LinkSpeed::Rate64GTps  => 6,
-            LinkSpeed::RateRsvdp   => 7,
+            LinkSpeed::Rate2GTps => 1,
+            LinkSpeed::Rate5GTps => 2,
+            LinkSpeed::Rate8GTps => 3,
+            LinkSpeed::Rate16GTps => 4,
+            LinkSpeed::Rate32GTps => 5,
+            LinkSpeed::Rate64GTps => 6,
+            LinkSpeed::RateRsvdp => 7,
             LinkSpeed::Reserved(v) => v,
         }
     }
 }
-
 
 /// Maximum/Negotiated Link Width
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -760,17 +984,17 @@ impl From<u8> for LinkWidth {
             0b00_1100 => Self::X12,
             0b01_0000 => Self::X16,
             0b10_0000 => Self::X32,
-                    v => Self::Reserved(v),
+            v => Self::Reserved(v),
         }
     }
 }
 impl From<LinkWidth> for u8 {
     fn from(data: LinkWidth) -> Self {
         match data {
-            LinkWidth::X1  => 1,
-            LinkWidth::X2  => 2,
-            LinkWidth::X4  => 4,
-            LinkWidth::X8  => 8,
+            LinkWidth::X1 => 1,
+            LinkWidth::X2 => 2,
+            LinkWidth::X4 => 4,
+            LinkWidth::X8 => 8,
             LinkWidth::X12 => 12,
             LinkWidth::X16 => 16,
             LinkWidth::X32 => 32,
@@ -778,7 +1002,6 @@ impl From<LinkWidth> for u8 {
         }
     }
 }
-
 
 /// Active State Power Management (ASPM) Support/Control
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -795,11 +1018,10 @@ impl From<u8> for ActiveStatePowerManagement {
             0b01 => Self::L0s,
             0b10 => Self::L1,
             0b11 => Self::L0sAndL1,
-               _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
-
 
 /// L0s Exit Latency
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -832,11 +1054,10 @@ impl From<u8> for L0sExitLatency {
             0b101 => Self::Ge1usAndLt2us,
             0b110 => Self::Ge2usAndLt4us,
             0b111 => Self::Gt4ns,
-                _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
-
 
 /// L1 Exit Latency
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -869,11 +1090,10 @@ impl From<u8> for L1ExitLatency {
             0b101 => Self::Ge16usAndLt32us,
             0b110 => Self::Ge32usAndLt64us,
             0b111 => Self::Gt64ns,
-                _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkControl {
@@ -901,11 +1121,19 @@ pub struct LinkControl {
 impl From<u16> for LinkControl {
     fn from(word: u16) -> Self {
         let (
-            aspmc, (), rcb, link_disable, retrain_link, common_clock_configuration, extended_synch,
-            enable_clock_power_management, hardware_autonomous_width_disable,
-            link_bandwidth_management_interrupt_enable, link_autonomous_bandwidth_interrupt_enable,
+            aspmc,
             (),
-        ) = P12::<_, 2,1,1,1,1,1,1,1,1,1,1,4>(word).lsb_into();
+            rcb,
+            link_disable,
+            retrain_link,
+            common_clock_configuration,
+            extended_synch,
+            enable_clock_power_management,
+            hardware_autonomous_width_disable,
+            link_bandwidth_management_interrupt_enable,
+            link_autonomous_bandwidth_interrupt_enable,
+            (),
+        ) = P12::<_, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4>(word).lsb_into();
         Self {
             active_state_power_management_control: From::<u8>::from(aspmc),
             read_completion_boundary: From::<bool>::from(rcb),
@@ -921,16 +1149,20 @@ impl From<u16> for LinkControl {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadCompletionBoundary {
     B64 = 64,
     B128 = 128,
 }
 impl From<bool> for ReadCompletionBoundary {
-    fn from(b: bool) -> Self { if b { Self::B128 } else { Self::B64 } }
+    fn from(b: bool) -> Self {
+        if b {
+            Self::B128
+        } else {
+            Self::B64
+        }
+    }
 }
-
 
 /// The Link Status register provides information about PCI Express Link specific parameters
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -955,10 +1187,15 @@ pub struct LinkStatus {
 impl From<u16> for LinkStatus {
     fn from(word: u16) -> Self {
         let (
-            cls, nlw, link_training_error, link_training, slot_clock_configuration,
-            data_link_layer_link_active, link_bandwidth_management_status,
+            cls,
+            nlw,
+            link_training_error,
+            link_training,
+            slot_clock_configuration,
+            data_link_layer_link_active,
+            link_bandwidth_management_status,
             link_autonomous_bandwidth_status,
-        ) = P8::<_, 4,6,1,1,1,1,1,1>(word).lsb_into();
+        ) = P8::<_, 4, 6, 1, 1, 1, 1, 1, 1>(word).lsb_into();
         Self {
             current_link_speed: From::<u8>::from(cls),
             negotiated_link_width: From::<u8>::from(nlw),
@@ -971,7 +1208,6 @@ impl From<u16> for LinkStatus {
         }
     }
 }
-
 
 /// Slot Capabilities, Slot Status, and Slot Control registers are required for Switch Downstream
 /// and Root Ports if a slot is implemented on the Port (indicated by the Slot Implemented bit in
@@ -991,7 +1227,6 @@ impl Slot {
         }
     }
 }
-
 
 /// The Slot Capabilities register identifies PCI Express slot specific capabilities
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1022,11 +1257,19 @@ pub struct SlotCapabilities {
 impl From<u32> for SlotCapabilities {
     fn from(dword: u32) -> Self {
         let (
-            attention_button_present, power_controller_present, mrl_sensor_present,
-            attention_indicator_present, power_indicator_present, hot_plug_surprise,
-            hot_plug_capable, spl_value, spl_scale, electromechanical_interlock_present,
-            no_command_completed_support, physical_slot_number,
-        ) = P12::<_, 1,1,1,1,1,1,1,8,2,1,1,13>(dword).lsb_into();
+            attention_button_present,
+            power_controller_present,
+            mrl_sensor_present,
+            attention_indicator_present,
+            power_indicator_present,
+            hot_plug_surprise,
+            hot_plug_capable,
+            spl_value,
+            spl_scale,
+            electromechanical_interlock_present,
+            no_command_completed_support,
+            physical_slot_number,
+        ) = P12::<_, 1, 1, 1, 1, 1, 1, 1, 8, 2, 1, 1, 13>(dword).lsb_into();
         Self {
             attention_button_present,
             power_controller_present,
@@ -1042,7 +1285,6 @@ impl From<u32> for SlotCapabilities {
         }
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SlotControl {
@@ -1072,12 +1314,19 @@ pub struct SlotControl {
 impl From<u16> for SlotControl {
     fn from(word: u16) -> Self {
         let (
-            attention_button_pressed_enable, power_fault_detected_enable,
-            mrl_sensor_changed_enable, presence_detect_changed_enable,
-            command_completed_interrupt_enable, hot_plug_interrupt_enable, aic, pic,
-            power_controller_control, electromechanical_interlock_control,
-            data_link_layer_state_changed_enable, (),
-        ) = P12::<_, 1,1,1,1,1,1,2,2,1,1,1,3>(word).lsb_into();
+            attention_button_pressed_enable,
+            power_fault_detected_enable,
+            mrl_sensor_changed_enable,
+            presence_detect_changed_enable,
+            command_completed_interrupt_enable,
+            hot_plug_interrupt_enable,
+            aic,
+            pic,
+            power_controller_control,
+            electromechanical_interlock_control,
+            data_link_layer_state_changed_enable,
+            (),
+        ) = P12::<_, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 3>(word).lsb_into();
         Self {
             attention_button_pressed_enable,
             power_fault_detected_enable,
@@ -1094,7 +1343,6 @@ impl From<u16> for SlotControl {
     }
 }
 
-
 /// Attention/Power Indicator Control
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IndicatorControl {
@@ -1110,11 +1358,10 @@ impl From<u8> for IndicatorControl {
             0b01 => Self::On,
             0b10 => Self::Blink,
             0b11 => Self::Off,
-               _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SlotStatus {
@@ -1140,10 +1387,17 @@ pub struct SlotStatus {
 impl From<u16> for SlotStatus {
     fn from(word: u16) -> Self {
         let (
-            attention_button_pressed, power_fault_detected, mrl_sensor_changed,
-            presence_detect_changed, command_completed, mrl_sensor_state, presence_detect_state,
-            electromechanical_interlock_status, data_link_layer_state_changed, (),
-        ) = P10::<_, 1,1,1,1,1,1,1,1,1,7>(word).lsb_into();
+            attention_button_pressed,
+            power_fault_detected,
+            mrl_sensor_changed,
+            presence_detect_changed,
+            command_completed,
+            mrl_sensor_state,
+            presence_detect_state,
+            electromechanical_interlock_status,
+            data_link_layer_state_changed,
+            (),
+        ) = P10::<_, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7>(word).lsb_into();
         Self {
             attention_button_pressed,
             power_fault_detected,
@@ -1157,7 +1411,6 @@ impl From<u16> for SlotStatus {
         }
     }
 }
-
 
 /// Root Ports and Root Complex Event Collectors must implement the Root Capabilities, Root Status,
 /// and Root Control registers
@@ -1177,7 +1430,6 @@ impl Root {
     }
 }
 
-
 /// The Root Control register controls PCI Express Root Complex specific parameters
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootControl {
@@ -1195,10 +1447,13 @@ pub struct RootControl {
 impl From<u16> for RootControl {
     fn from(word: u16) -> Self {
         let (
-            system_error_on_correctable_error_enable, system_error_on_non_fatal_error_enable,
-            system_error_on_fatal_error_enable, pme_interrupt_enable,
-            crs_software_visibility_enable, (),
-        ) = P6::<_, 1,1,1,1,1,11>(word).lsb_into();
+            system_error_on_correctable_error_enable,
+            system_error_on_non_fatal_error_enable,
+            system_error_on_fatal_error_enable,
+            pme_interrupt_enable,
+            crs_software_visibility_enable,
+            (),
+        ) = P6::<_, 1, 1, 1, 1, 1, 11>(word).lsb_into();
         Self {
             system_error_on_correctable_error_enable,
             system_error_on_non_fatal_error_enable,
@@ -1209,7 +1464,6 @@ impl From<u16> for RootControl {
     }
 }
 
-
 /// The Root Capabilities register identifies PCI Express Root Port specific capabilities
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootCapabilities {
@@ -1218,15 +1472,12 @@ pub struct RootCapabilities {
 }
 impl From<u16> for RootCapabilities {
     fn from(word: u16) -> Self {
-        let (
-            crs_software_visibility, (),
-        ) = P2::<_, 1,15>(word).lsb_into();
+        let (crs_software_visibility, ()) = P2::<_, 1, 15>(word).lsb_into();
         Self {
             crs_software_visibility,
         }
     }
 }
-
 
 /// The Root Status register provides information about PCI Express device specific parameters
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1240,9 +1491,8 @@ pub struct RootStatus {
 }
 impl From<u32> for RootStatus {
     fn from(dword: u32) -> Self {
-        let (
-            pme_requester_id, pme_status, pme_pending, (),
-        ) = P4::<_, 16,1,1,14>(dword).lsb_into();
+        let (pme_requester_id, pme_status, pme_pending, ()) =
+            P4::<_, 16, 1, 1, 14>(dword).lsb_into();
         Self {
             pme_requester_id,
             pme_status,
@@ -1267,9 +1517,8 @@ impl Device2 {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DeviceCapabilities2  {
+pub struct DeviceCapabilities2 {
     /// Completion Timeout Ranges Supported
     pub completion_timeout_ranges_supported: CompletionTimeoutRanges,
     /// Completion Timeout Disable Supported
@@ -1314,14 +1563,29 @@ pub struct DeviceCapabilities2  {
 impl From<u32> for DeviceCapabilities2 {
     fn from(dword: u32) -> Self {
         let (
-            ctrs, completion_timeout_disable_supported, ari_forwarding_supported,
-            atomic_op_routing_supported, u32_atomicop_completer_supported,
-            u64_atomicop_completer_supported, u128_cas_completer_supported,
-            no_ro_enabled_pr_pr_passing, ltr_mechanism_supported, tcs, lsc,
-            support_10bit_tag_completer, support_10bit_tag_requester, os,
-            extended_fmt_field_supported, end_end_tlp_prefix_supported, meetp, eprs,
-            emergency_power_reduction_initialization_required, (), frs_supported,
-        ) = P21::<_, 4,1,1,1,1,1,1,1,1,2,2,1,1,2,1,1,2,2,1,4,1>(dword).lsb_into();
+            ctrs,
+            completion_timeout_disable_supported,
+            ari_forwarding_supported,
+            atomic_op_routing_supported,
+            u32_atomicop_completer_supported,
+            u64_atomicop_completer_supported,
+            u128_cas_completer_supported,
+            no_ro_enabled_pr_pr_passing,
+            ltr_mechanism_supported,
+            tcs,
+            lsc,
+            support_10bit_tag_completer,
+            support_10bit_tag_requester,
+            os,
+            extended_fmt_field_supported,
+            end_end_tlp_prefix_supported,
+            meetp,
+            eprs,
+            emergency_power_reduction_initialization_required,
+            (),
+            frs_supported,
+        ) = P21::<_, 4, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1, 2, 2, 1, 4, 1>(dword)
+            .lsb_into();
         Self {
             completion_timeout_ranges_supported: From::<u8>::from(ctrs),
             completion_timeout_disable_supported,
@@ -1347,7 +1611,6 @@ impl From<u32> for DeviceCapabilities2 {
     }
 }
 
-
 /// Indicates device Function support for the optional Completion Timeout programmability mechanism
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompletionTimeoutRanges {
@@ -1372,10 +1635,10 @@ pub enum CompletionTimeoutRanges {
     Reserved(u8),
 }
 impl CompletionTimeoutRanges {
-    pub const A: Range<f64> = 50e-6 .. 10e-3;
-    pub const B: Range<f64> = 10e-3 .. 250e-3;
-    pub const C: Range<f64> = 250e-6 .. 4.0;
-    pub const D: Range<f64> = 4.0 .. 64.0;
+    pub const A: Range<f64> = 50e-6..10e-3;
+    pub const B: Range<f64> = 10e-3..250e-3;
+    pub const C: Range<f64> = 250e-6..4.0;
+    pub const D: Range<f64> = 4.0..64.0;
 }
 impl From<u8> for CompletionTimeoutRanges {
     fn from(byte: u8) -> Self {
@@ -1388,7 +1651,7 @@ impl From<u8> for CompletionTimeoutRanges {
             0b0111 => Self::RangesABC,
             0b1110 => Self::RangesBCD,
             0b1111 => Self::RangesABCD,
-                 v => Self::Reserved(v),
+            v => Self::Reserved(v),
         }
     }
 }
@@ -1396,14 +1659,14 @@ impl From<CompletionTimeoutRanges> for u8 {
     fn from(data: CompletionTimeoutRanges) -> Self {
         match data {
             CompletionTimeoutRanges::NotSupported => 0b0000,
-            CompletionTimeoutRanges::RangeA       => 0b0001,
-            CompletionTimeoutRanges::RangeB       => 0b0010,
-            CompletionTimeoutRanges::RangesAB     => 0b0011,
-            CompletionTimeoutRanges::RangesBC     => 0b0110,
-            CompletionTimeoutRanges::RangesABC    => 0b0111,
-            CompletionTimeoutRanges::RangesBCD    => 0b1110,
-            CompletionTimeoutRanges::RangesABCD   => 0b1111,
-            CompletionTimeoutRanges::Reserved(v)  => v,
+            CompletionTimeoutRanges::RangeA => 0b0001,
+            CompletionTimeoutRanges::RangeB => 0b0010,
+            CompletionTimeoutRanges::RangesAB => 0b0011,
+            CompletionTimeoutRanges::RangesBC => 0b0110,
+            CompletionTimeoutRanges::RangesABC => 0b0111,
+            CompletionTimeoutRanges::RangesBCD => 0b1110,
+            CompletionTimeoutRanges::RangesABCD => 0b1111,
+            CompletionTimeoutRanges::Reserved(v) => v,
         }
     }
 }
@@ -1427,16 +1690,16 @@ impl From<u8> for TphCompleter {
             0b01 => Self::Tph,
             0b10 => Self::Reserved,
             0b11 => Self::TphAndExtendedTph,
-               _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
 impl From<TphCompleter> for u8 {
     fn from(data: TphCompleter) -> Self {
         match data {
-            TphCompleter::NotSupported      => 0b00,
-            TphCompleter::Tph               => 0b01,
-            TphCompleter::Reserved          => 0b10,
+            TphCompleter::NotSupported => 0b00,
+            TphCompleter::Tph => 0b01,
+            TphCompleter::Reserved => 0b10,
             TphCompleter::TphAndExtendedTph => 0b11,
         }
     }
@@ -1462,17 +1725,17 @@ impl From<u8> for LnSystemCls {
             0b01 => Self::Cachelines64Byte,
             0b10 => Self::Cachelines128Byte,
             0b11 => Self::Reserved,
-               _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
 impl From<LnSystemCls> for u8 {
     fn from(data: LnSystemCls) -> Self {
         match data {
-            LnSystemCls::NotSupported      => 0b00,
-            LnSystemCls::Cachelines64Byte  => 0b01,
+            LnSystemCls::NotSupported => 0b00,
+            LnSystemCls::Cachelines64Byte => 0b01,
             LnSystemCls::Cachelines128Byte => 0b10,
-            LnSystemCls::Reserved          => 0b11,
+            LnSystemCls::Reserved => 0b11,
         }
     }
 }
@@ -1496,16 +1759,16 @@ impl From<u8> for Obff {
             0b01 => Self::Message,
             0b10 => Self::Wake,
             0b11 => Self::WakeAndMessage,
-               _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
 impl From<Obff> for u8 {
     fn from(data: Obff) -> Self {
         match data {
-            Obff::NotSupported   => 0b00,
-            Obff::Message        => 0b01,
-            Obff::Wake           => 0b10,
+            Obff::NotSupported => 0b00,
+            Obff::Message => 0b01,
+            Obff::Wake => 0b10,
             Obff::WakeAndMessage => 0b11,
         }
     }
@@ -1530,7 +1793,7 @@ impl From<u8> for MaxEndEndTlpPrefixes {
             0b01 => Self::Max1,
             0b10 => Self::Max2,
             0b11 => Self::Max3,
-               _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
@@ -1566,25 +1829,24 @@ impl From<u8> for EmergencyPowerReduction {
             0b01 => Self::DeviceSpecific,
             0b10 => Self::FormFactorOrDeviceSpecific,
             0b11 => Self::Reserved,
-               _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
 impl From<EmergencyPowerReduction> for u8 {
     fn from(data: EmergencyPowerReduction) -> Self {
         match data {
-             EmergencyPowerReduction::NotSupported               => 0b00,
-             EmergencyPowerReduction::DeviceSpecific             => 0b01,
-             EmergencyPowerReduction::FormFactorOrDeviceSpecific => 0b10,
-             EmergencyPowerReduction::Reserved                   => 0b11,
+            EmergencyPowerReduction::NotSupported => 0b00,
+            EmergencyPowerReduction::DeviceSpecific => 0b01,
+            EmergencyPowerReduction::FormFactorOrDeviceSpecific => 0b10,
+            EmergencyPowerReduction::Reserved => 0b11,
         }
     }
 }
 
-
 /// Device Control 2 Register
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DeviceControl2  {
+pub struct DeviceControl2 {
     /// Completion Timeout Value
     pub completion_timeout_value: CompletionTimeoutValue,
     /// Completion Timeout Disable
@@ -1613,11 +1875,19 @@ pub struct DeviceControl2  {
 impl From<u16> for DeviceControl2 {
     fn from(word: u16) -> Self {
         let (
-            ctv, completion_timeout_disable, ari_forwarding_enable, atomic_op_requester_enable,
-            atomic_op_egress_blocking, ido_request_enable, ido_completion_enable,
-            ltr_mechanism_enable, emergency_power_reduction_request, enable_10bit_tag_requester,
-            oe, eetpd,
-        ) = P12::<_, 4,1,1,1,1,1,1,1,1,1,2,1>(word).lsb_into();
+            ctv,
+            completion_timeout_disable,
+            ari_forwarding_enable,
+            atomic_op_requester_enable,
+            atomic_op_egress_blocking,
+            ido_request_enable,
+            ido_completion_enable,
+            ltr_mechanism_enable,
+            emergency_power_reduction_request,
+            enable_10bit_tag_requester,
+            oe,
+            eetpd,
+        ) = P12::<_, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1>(word).lsb_into();
         Self {
             completion_timeout_value: From::<u8>::from(ctv),
             completion_timeout_disable,
@@ -1677,15 +1947,15 @@ impl From<CompletionTimeoutValue> for u8 {
     fn from(data: CompletionTimeoutValue) -> Self {
         match data {
             CompletionTimeoutValue::DefaultRange50usTo50ms => 0b0000,
-            CompletionTimeoutValue::RangeA50usTo100us      => 0b0001,
-            CompletionTimeoutValue::RangeA1msTo10ms        => 0b0010,
-            CompletionTimeoutValue::RangeB16msTo55mss      => 0b0101,
-            CompletionTimeoutValue::RangeB65msTo210ms      => 0b0110,
-            CompletionTimeoutValue::RangeC260msTo900ms     => 0b1001,
-            CompletionTimeoutValue::RangeC1000msTo3500ms   => 0b1010,
-            CompletionTimeoutValue::RangeD4sTo13s          => 0b1101,
-            CompletionTimeoutValue::RangeD17sTo64s         => 0b1110,
-            CompletionTimeoutValue::Reserved(v)            => v,
+            CompletionTimeoutValue::RangeA50usTo100us => 0b0001,
+            CompletionTimeoutValue::RangeA1msTo10ms => 0b0010,
+            CompletionTimeoutValue::RangeB16msTo55mss => 0b0101,
+            CompletionTimeoutValue::RangeB65msTo210ms => 0b0110,
+            CompletionTimeoutValue::RangeC260msTo900ms => 0b1001,
+            CompletionTimeoutValue::RangeC1000msTo3500ms => 0b1010,
+            CompletionTimeoutValue::RangeD4sTo13s => 0b1101,
+            CompletionTimeoutValue::RangeD17sTo64s => 0b1110,
+            CompletionTimeoutValue::Reserved(v) => v,
         }
     }
 }
@@ -1708,31 +1978,28 @@ impl From<u8> for ObffEnable {
             0b01 => Self::MessageSignalingA,
             0b10 => Self::MessageSignalingB,
             0b11 => Self::WakeSignaling,
-               _ => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
 impl From<ObffEnable> for u8 {
     fn from(data: ObffEnable) -> Self {
         match data {
-            ObffEnable::Disabled          => 0b00,
+            ObffEnable::Disabled => 0b00,
             ObffEnable::MessageSignalingA => 0b01,
             ObffEnable::MessageSignalingB => 0b10,
-            ObffEnable::WakeSignaling     => 0b11,
+            ObffEnable::WakeSignaling => 0b11,
         }
     }
 }
 
-
 /// Device Status 2 Register is a placeholder
 /// There are no capabilities that require this register
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DeviceStatus2  {
-}
+pub struct DeviceStatus2 {}
 impl From<u16> for DeviceStatus2 {
     fn from(_word: u16) -> Self {
-        Self {
-        }
+        Self {}
     }
 }
 
@@ -1779,10 +2046,9 @@ impl Link2 {
     }
 }
 
-
 /// Link Capabilities 2 Register
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LinkCapabilities2  {
+pub struct LinkCapabilities2 {
     /// Supported Link Speeds Vector
     pub supported_link_speeds_vector: SupportedLinkSpeedsVector,
     /// Crosslink Supported
@@ -1801,9 +2067,16 @@ pub struct LinkCapabilities2  {
 impl From<u32> for LinkCapabilities2 {
     fn from(dword: u32) -> Self {
         let (
-            (), slsv, crosslink_supported, lsog, lsor, retimer_presence_detect_supported,
-            two_retimers_presence_detect_supported, (), drs_supported,
-        ) = P9::<_, 1,7,1,7,7,1,1,6,1>(dword).lsb_into();
+            (),
+            slsv,
+            crosslink_supported,
+            lsog,
+            lsor,
+            retimer_presence_detect_supported,
+            two_retimers_presence_detect_supported,
+            (),
+            drs_supported,
+        ) = P9::<_, 1, 7, 1, 7, 7, 1, 1, 6, 1>(dword).lsb_into();
         Self {
             supported_link_speeds_vector: From::<u8>::from(slsv),
             crosslink_supported,
@@ -1816,10 +2089,9 @@ impl From<u32> for LinkCapabilities2 {
     }
 }
 
-
 /// Indicates the supported Link speed(s) of the associated Port
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SupportedLinkSpeedsVector  {
+pub struct SupportedLinkSpeedsVector {
     /// 2.5 GT/s
     pub speed_2_5_gtps: bool,
     /// 5.0 GT/s
@@ -1838,9 +2110,14 @@ pub struct SupportedLinkSpeedsVector  {
 impl From<u8> for SupportedLinkSpeedsVector {
     fn from(byte: u8) -> Self {
         let (
-            speed_2_5_gtps, speed_5_0_gtps, speed_8_0_gtps, speed_16_0_gtps, speed_32_0_gtps,
-            speed_64_0_gtps, reserved,
-        ) = P7::<_, 1,1,1,1,1,1,1>(byte).lsb_into();
+            speed_2_5_gtps,
+            speed_5_0_gtps,
+            speed_8_0_gtps,
+            speed_16_0_gtps,
+            speed_32_0_gtps,
+            speed_64_0_gtps,
+            reserved,
+        ) = P7::<_, 1, 1, 1, 1, 1, 1, 1>(byte).lsb_into();
         Self {
             speed_2_5_gtps,
             speed_5_0_gtps,
@@ -1853,9 +2130,8 @@ impl From<u8> for SupportedLinkSpeedsVector {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LinkControl2  {
+pub struct LinkControl2 {
     /// Target Link Speed
     pub target_link_speed: LinkSpeed,
     /// Enter Compliance
@@ -1875,9 +2151,15 @@ pub struct LinkControl2  {
 impl From<u16> for LinkControl2 {
     fn from(word: u16) -> Self {
         let (
-            tls, enter_compliance, hardware_autonomous_speed_disable, sde, tm,
-            enter_modified_compliance, compliance_sos, cpode,
-        ) = P8::<_, 4,1,1,1,3,1,1,4>(word).lsb_into();
+            tls,
+            enter_compliance,
+            hardware_autonomous_speed_disable,
+            sde,
+            tm,
+            enter_modified_compliance,
+            compliance_sos,
+            cpode,
+        ) = P8::<_, 4, 1, 1, 1, 3, 1, 1, 4>(word).lsb_into();
         Self {
             target_link_speed: From::<u8>::from(tls),
             enter_compliance,
@@ -1936,9 +2218,8 @@ impl From<u8> for CompliancePresetOrDeEmphasis {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LinkStatus2  {
+pub struct LinkStatus2 {
     /// Current De-emphasis Level
     pub current_de_emphasis_level: DeEmphasis,
     /// Equalization Complete
@@ -1965,11 +2246,19 @@ pub struct LinkStatus2  {
 impl From<u16> for LinkStatus2 {
     fn from(word: u16) -> Self {
         let (
-            cdel, equalization_complete, equalization_phase_1_successful,
-            equalization_phase_2_successful, equalization_phase_3_successful,
-            link_equalization_request, retimer_presence_detected, two_retimers_presence_detected,
-            cr, (), dcp, drs_message_received,
-        ) = P12::<_, 1,1,1,1,1,1,1,1,2,2,3,1>(word).lsb_into();
+            cdel,
+            equalization_complete,
+            equalization_phase_1_successful,
+            equalization_phase_2_successful,
+            equalization_phase_3_successful,
+            link_equalization_request,
+            retimer_presence_detected,
+            two_retimers_presence_detected,
+            cr,
+            (),
+            dcp,
+            drs_message_received,
+        ) = P12::<_, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 3, 1>(word).lsb_into();
         Self {
             current_de_emphasis_level: From::<bool>::from(cdel),
             equalization_complete,
@@ -1985,7 +2274,6 @@ impl From<u16> for LinkStatus2 {
         }
     }
 }
-
 
 /// Indicates the state of the Crosslink negotiation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2010,7 +2298,6 @@ impl From<u8> for CrosslinkResolution {
         }
     }
 }
-
 
 /// Indicates the presence and DRS status for the Downstream Component, if any, connected to the
 /// Link
@@ -2042,7 +2329,6 @@ impl From<u8> for DownstreamComponentPresence {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Slot2 {
     pub capabilities: SlotCapabilities2,
@@ -2059,13 +2345,11 @@ impl Slot2 {
     }
 }
 
-
 /// Slot Capabilities 2 Register
 ///
 /// This section is a placeholder. There are no capabilities that require this register
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlotCapabilities2  {
-}
+pub struct SlotCapabilities2 {}
 impl From<u32> for SlotCapabilities2 {
     fn from(_dword: u32) -> Self {
         Self {}
@@ -2076,8 +2360,7 @@ impl From<u32> for SlotCapabilities2 {
 ///
 /// This section is a placeholder. There are no capabilities that require this register
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlotControl2  {
-}
+pub struct SlotControl2 {}
 impl From<u16> for SlotControl2 {
     fn from(_word: u16) -> Self {
         Self {}
@@ -2088,14 +2371,12 @@ impl From<u16> for SlotControl2 {
 ///
 /// This section is a placeholder. There are no capabilities that require this register
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlotStatus2  {
-}
+pub struct SlotStatus2 {}
 impl From<u16> for SlotStatus2 {
     fn from(_word: u16) -> Self {
         Self {}
     }
 }
-
 
 /// Transmitter Preset
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2154,16 +2435,15 @@ impl From<u8> for ReceiverPresetHint {
             0b100 => Self::Minus10dB,
             0b101 => Self::Minus11dB,
             0b110 => Self::Minus12dB,
-                _ => Self::Reserved,
+            _ => Self::Reserved,
         }
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn endpoint() {
@@ -2193,10 +2473,11 @@ mod tests {
         //         LnkSta2: Current De-emphasis Level: -3.5dB, EqualizationComplete+, EqualizationPhase1+
         //                  EqualizationPhase2+, EqualizationPhase3+, LinkEqualizationRequest-
         let data = [
-            0x10, 0xe0, 0x02, 0x00, 0xc2, 0x8c, 0x00, 0x10, 0x3e, 0x20, 0x09, 0x00, 0x43, 0x5c, 0x42, 0x00,
-            0x40, 0x00, 0x43, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x1f, 0x08, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x00,
-            0x01, 0x00, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x10, 0xe0, 0x02, 0x00, 0xc2, 0x8c, 0x00, 0x10, 0x3e, 0x20, 0x09, 0x00, 0x43, 0x5c,
+            0x42, 0x00, 0x40, 0x00, 0x43, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x08, 0x00, 0x00, 0x06, 0x00,
+            0x00, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x01, 0x00, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
         ];
         let result: PciExpress = data[2..].try_into().unwrap();
 
@@ -2242,15 +2523,16 @@ mod tests {
                 },
                 link_2: Some(Link2 {
                     capabilities: LinkCapabilities2 {
-                        lower_skp_os_generation_supported_speeds_vector: SupportedLinkSpeedsVector {
-                            speed_2_5_gtps: false,
-                            speed_5_0_gtps: false,
-                            speed_8_0_gtps: false,
-                            speed_16_0_gtps: false,
-                            speed_32_0_gtps: false,
-                            speed_64_0_gtps: false,
-                            reserved: false,
-                        },
+                        lower_skp_os_generation_supported_speeds_vector:
+                            SupportedLinkSpeedsVector {
+                                speed_2_5_gtps: false,
+                                speed_5_0_gtps: false,
+                                speed_8_0_gtps: false,
+                                speed_16_0_gtps: false,
+                                speed_32_0_gtps: false,
+                                speed_64_0_gtps: false,
+                                reserved: false,
+                            },
                         lower_skp_os_reception_supported_speeds_vector: SupportedLinkSpeedsVector {
                             speed_2_5_gtps: false,
                             speed_5_0_gtps: false,
@@ -2294,7 +2576,8 @@ mod tests {
                         retimer_presence_detected: false,
                         two_retimers_presence_detected: false,
                         crosslink_resolution: CrosslinkResolution::NotSupported,
-                        downstream_component_presence: DownstreamComponentPresence::DownNotDetermined,
+                        downstream_component_presence:
+                            DownstreamComponentPresence::DownNotDetermined,
                         drs_message_received: false,
                     },
                 }),
@@ -2313,7 +2596,10 @@ mod tests {
                     attention_indicator_present: false,
                     power_indicator_present: false,
                     role_based_error_reporting: true,
-                    captured_slot_power_limit: SlotPowerLimit { value: 0, scale: 1.0 },
+                    captured_slot_power_limit: SlotPowerLimit {
+                        value: 0,
+                        scale: 1.0,
+                    },
                     function_level_reset_capability: true,
                 },
                 control: DeviceControl {
