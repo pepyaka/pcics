@@ -13,8 +13,8 @@ Extended Capabilities list:
 - [x] [Device Serial Number](device_serial_number) (0003h)
 - [x] [Power Budgeting](power_budgeting) (0004h)
 - [x] [Root Complex Link Declaration](root_complex_link_declaration) (0005h)
-- [ ] [Root Complex Internal Link Control](root_complex_internal_link_control) (0006h)
-- [ ] [Root Complex Event Collector Endpoint Association](root_complex_event_collector_endpoint_association) (0007h)
+- [x] [Root Complex Internal Link Control](root_complex_internal_link_control) (0006h)
+- [x] [Root Complex Event Collector Endpoint Association](root_complex_event_collector_endpoint_association) (0007h)
 - [ ] [Multi-Function Virtual Channel (MFVC)](multifunction_virtual_channel) (0008h)
 - [x] [Virtual Channel (VC)](virtual_channel) (0009h) – used if an MFVC Extended Cap structure is present in the device
 - [ ] [Root Complex Register Block (RCRB) Header](root_complex_register_block_header) (000Ah)
@@ -231,9 +231,10 @@ fn parse_ecap<'a>(
             .try_into()
             .map(Kind::RootComplexInternalLinkControl)
             .context(DataSnafu { offset })?,
-        0x0007 => Kind::RootComplexEventCollectorEndpointAssociation(
-            RootComplexEventCollectorEndpointAssociation,
-        ),
+        0x0007 => ecap_data
+            .try_into()
+            .map(Kind::RootComplexEventCollectorEndpointAssociation)
+            .context(DataSnafu { offset })?,
         0x0008 => Kind::MultifunctionVirtualChannel(MultifunctionVirtualChannel),
         0x0009 => ecap_data
             .try_into()
@@ -533,10 +534,7 @@ pub mod root_complex_internal_link_control;
 pub use root_complex_internal_link_control::RootComplexInternalLinkControl;
 
 // 0007h Root Complex Event Collector Endpoint Association
-pub mod root_complex_event_collector_endpoint_association {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct RootComplexEventCollectorEndpointAssociation;
-}
+pub mod root_complex_event_collector_endpoint_association;
 pub use root_complex_event_collector_endpoint_association::RootComplexEventCollectorEndpointAssociation;
 
 // 0008h Multi-Function Virtual Channel (MFVC)
