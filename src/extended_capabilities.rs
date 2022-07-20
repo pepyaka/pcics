@@ -15,7 +15,7 @@ Extended Capabilities list:
 - [x] [Root Complex Link Declaration](root_complex_link_declaration) (0005h)
 - [x] [Root Complex Internal Link Control](root_complex_internal_link_control) (0006h)
 - [x] [Root Complex Event Collector Endpoint Association](root_complex_event_collector_endpoint_association) (0007h)
-- [ ] [Multi-Function Virtual Channel (MFVC)](multifunction_virtual_channel) (0008h)
+- [x] [Multi-Function Virtual Channel (MFVC)](multifunction_virtual_channel) (0008h)
 - [x] [Virtual Channel (VC)](virtual_channel) (0009h) – used if an MFVC Extended Cap structure is present in the device
 - [ ] [Root Complex Register Block (RCRB) Header](root_complex_register_block_header) (000Ah)
 - [x] [Vendor-Specific Extended Capability (VSEC)](vendor_specific_extended_capability) (000Bh)
@@ -122,6 +122,11 @@ pub enum ExtendedCapabilityError {
     RootComplexLinkDeclaration {
         offset: u16,
         source: root_complex_link_declaration::RootComplexLinkDeclarationError,
+    },
+    #[snafu(display("[{offset:03x}] Multi-Function Virtual Channel error: {source}"))]
+    MultifunctionVirtualChannel {
+        offset: u16,
+        source: multifunction_virtual_channel::MultifunctionVirtualChannelError,
     },
     #[snafu(display("[{offset:03x}] Single Root I/O Virtualization error: {source}"))]
     SingleRootIoVirtualization {
@@ -235,7 +240,11 @@ fn parse_ecap<'a>(
             .try_into()
             .map(Kind::RootComplexEventCollectorEndpointAssociation)
             .context(DataSnafu { offset })?,
-        0x0008 => Kind::MultifunctionVirtualChannel(MultifunctionVirtualChannel),
+        // MFVC use data with PCI Express Extended Capability Header for simpler calculations
+        0x0008 => bytes
+            .try_into()
+            .map(Kind::MultifunctionVirtualChannel)
+            .context(MultifunctionVirtualChannelSnafu { offset })?,
         0x0009 => ecap_data
             .try_into()
             .map(Kind::VirtualChannelMfvcPresent)
@@ -334,6 +343,8 @@ pub struct ExtendedCapability<'a> {
     pub offset: u16,
 }
 impl<'a> ExtendedCapability<'a> {
+    /// Extended Capability Header length in bytes
+    pub const HEADER_SIZE: usize = 4;
     pub fn id(&self) -> u16 {
         match self.kind {
             ExtendedCapabilityKind::Null => 0x0000,
@@ -414,7 +425,7 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Root Complex Event Collector Endpoint Association
     RootComplexEventCollectorEndpointAssociation(RootComplexEventCollectorEndpointAssociation),
     /// Multi-Function Virtual Channel (MFVC)
-    MultifunctionVirtualChannel(MultifunctionVirtualChannel),
+    MultifunctionVirtualChannel(MultifunctionVirtualChannel<'a>),
     /// Virtual Channel (VC) – used if an MFVC Extended Cap structure is present in the device
     VirtualChannelMfvcPresent(VirtualChannel<'a>),
     /// Root Complex Register Block (RCRB) Header
@@ -538,10 +549,7 @@ pub mod root_complex_event_collector_endpoint_association;
 pub use root_complex_event_collector_endpoint_association::RootComplexEventCollectorEndpointAssociation;
 
 // 0008h Multi-Function Virtual Channel (MFVC)
-pub mod multifunction_virtual_channel {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct MultifunctionVirtualChannel;
-}
+pub mod multifunction_virtual_channel;
 pub use multifunction_virtual_channel::MultifunctionVirtualChannel;
 
 // 000Ah Root Complex Register Block (RCRB) Header
