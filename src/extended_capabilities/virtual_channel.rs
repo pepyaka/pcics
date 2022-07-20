@@ -6,15 +6,17 @@ that have Ports (or for individual Functions) that support functionality beyond 
 Traffic Class (TC0) over the default Virtual Channel (VC0).
 
 ## Struct diagram
-[VirtualChannel]
-- [PortVcCapability1]
-  - [ReferenceClock]
-  - [PortArbitrationTableEntrySize]
-- [PortVcCapability2]
-  - [VcArbitrationCapability]
-- [PortVcControl]
-  - [VcArbitrationSelect]
-- [PortVcStatus]
+<pre>
+<a href="struct.VirtualChannel.html">VirtualChannel</a>
+├─ <a href="struct.PortVcCapability1.html">PortVcCapability1</a>
+│  ├─ <a href="enum.ReferenceClock.html">ReferenceClock</a>
+│  └─ <a href="struct.PortArbitrationTableEntrySize.html">PortArbitrationTableEntrySize</a>
+├─ <a href="struct.PortVcCapability2.html">PortVcCapability2</a>
+│  └─ <a href="struct.VcArbitrationCapability.html">VcArbitrationCapability</a>
+├─ <a href="struct.PortVcControl.html">PortVcControl</a>
+│  └─ <a href="enum.VcArbitrationSelect.html">VcArbitrationSelect</a>
+└─ <a href="struct.PortVcStatus.html">PortVcStatus</a>
+</pre>
 
 ## Examples
 > ```text
@@ -31,46 +33,55 @@ Traffic Class (TC0) over the default Virtual Channel (VC0).
 ```rust
 # use pcics::extended_capabilities::virtual_channel::*;
 let data = [
-    0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x80,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
+    0x02, 0x00, 0x01, 0x00, // Capability header
+    0x00, 0x00, 0x00, 0x00, // Port VC Capability Register 1
+    0x00, 0x00, 0x00, 0x00, // Port VC Capability Register 2
+    0x00, 0x00,             // Port VC Control Register
+    0x00, 0x00,             // Port VC Status Register
+    0x00, 0x00, 0x00, 0x00, // VC Resource Capability Register (0)
+    0xff, 0x00, 0x00, 0x80, // VC Resource Control Register (0)
+    0x00, 0x00,             // RsvdP
+    0x00, 0x00,             // VC Resource Status Register (0)
 ];
 
 let result: VirtualChannel = data[4..].try_into().unwrap();
 
-let mut sample = result.clone();
-sample.port_vc_capability_1 = PortVcCapability1 {
-    extended_vc_count: 0,
-    low_priority_extended_vc_count: 0,
-    reference_clock: ReferenceClock::Rc100ns,
-    port_arbitration_table_entry_size: 0.into(),
-};
-sample.port_vc_capability_2 = PortVcCapability2 {
-    vc_arbitration_capability: VcArbitrationCapability {
-        hardware_fixed_arbitration: false,
-        wrr_32_phases: false,
-        wrr_64_phases: false,
-        wrr_128_phases: false,
-        reserved: 0x0,
-    },
-    vc_arbitration_table_offset: 0,
-};
-sample.port_vc_control = PortVcControl {
-    load_vc_arbitration_table: false,
-    vc_arbitration_select: VcArbitrationSelect::HardwareFixedArbitration,
-};
-sample.port_vc_status = PortVcStatus {
-    vc_arbitration_table_status: false,
+let mut sample_data = [0u8; 6 * 4];
+sample_data[0x10] = 0xff;
+sample_data[0x13] = 0x80;
+let sample = {
+    let mut vc: VirtualChannel = sample_data.as_slice().try_into().unwrap();
+    vc.port_vc_capability_1 = PortVcCapability1 {
+        extended_vc_count: 0,
+        low_priority_extended_vc_count: 0,
+        reference_clock: ReferenceClock::Rc100ns,
+        port_arbitration_table_entry_size: 0.into(),
+    };
+    vc.port_vc_capability_2 = PortVcCapability2 {
+        vc_arbitration_capability: VcArbitrationCapability {
+            hardware_fixed_arbitration: false,
+            wrr_32_phases: false,
+            wrr_64_phases: false,
+            wrr_128_phases: false,
+            reserved: 0x0,
+        },
+        vc_arbitration_table_offset: 0,
+    };
+    vc.port_vc_control = PortVcControl {
+        load_vc_arbitration_table: false,
+        vc_arbitration_select: VcArbitrationSelect::HardwareFixedArbitration,
+    };
+    vc.port_vc_status = PortVcStatus {
+        vc_arbitration_table_status: false,
+    };
+    vc
 };
 
 assert_eq!(sample, result);
 ```
 */
 
-use heterob::{bit_numbering::Lsb, endianness::Le, Seq, P2, P3, P4, P7, P8, P13};
+use heterob::{bit_numbering::Lsb, endianness::Le, Seq, P13, P2, P3, P4, P7, P8};
 use snafu::Snafu;
 
 use super::ExtendedCapabilityDataError;
@@ -608,7 +619,7 @@ impl<'a> Iterator for VcArbitrationTable<'a> {
         if let Some(vate) = self.vate.take() {
             Some(vate)
         } else {
-            let VatePair([curr, next]) = (*self.data.next()?).into();
+            let VatEntryPair([curr, next]) = (*self.data.next()?).into();
             self.vate = Some(next);
             Some(curr)
         }
@@ -627,10 +638,13 @@ impl<'a> Eq for VcArbitrationTable<'a> {}
 pub struct VcArbitrationTableEntry {
     /// Indicating that the corresponding phase within the WRR arbitration period is assigned to
     /// the Virtual Channel indicated by the VC ID
-    vc_id: u8,
+    pub vc_id: u8,
 }
-struct VatePair([VcArbitrationTableEntry; 2]);
-impl From<u8> for VatePair {
+
+/// One byte size VAT Entries handler
+struct VatEntryPair([VcArbitrationTableEntry; 2]);
+
+impl From<u8> for VatEntryPair {
     /// One byte contains two [VcArbitrationTableEntry]
     fn from(byte: u8) -> Self {
         Self([
