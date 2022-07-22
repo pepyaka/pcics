@@ -17,7 +17,7 @@ Extended Capabilities list:
 - [x] [Root Complex Event Collector Endpoint Association](root_complex_event_collector_endpoint_association) (0007h)
 - [x] [Multi-Function Virtual Channel (MFVC)](multifunction_virtual_channel) (0008h)
 - [x] [Virtual Channel (VC)](virtual_channel) (0009h) – used if an MFVC Extended Cap structure is present in the device
-- [ ] [Root Complex Register Block (RCRB) Header](root_complex_register_block_header) (000Ah)
+- [x] [Root Complex Register Block (RCRB) Header](root_complex_register_block_header) (000Ah)
 - [x] [Vendor-Specific Extended Capability (VSEC)](vendor_specific_extended_capability) (000Bh)
 - [ ] [Configuration Access Correlation (CAC)](configuration_access_correlation) (000Ch)
 - [x] [Access Control Services (ACS)](access_control_services) (000Dh)
@@ -98,7 +98,7 @@ let sample = vec![
 
 
 
-use heterob::{P3, bit_numbering::LsbInto};
+use heterob::{P3, bit_numbering::{LsbInto, Lsb}, endianness::FromLeBytes};
 use snafu::prelude::*;
 
 use super::ECS_OFFSET;
@@ -181,6 +181,51 @@ impl<'a> Iterator for ExtendedCapabilities<'a> {
     }
 }
 
+/// PCI Express Extended Capability Header
+///
+/// All PCI Express Extended Capabilities must begin with a PCI Express
+/// Extended Capability header
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExtendedCapabilityHeader {
+    /// PCI Express Extended Capability ID
+    ///
+    /// This field is a PCI-SIG defined ID number that indicates the nature and
+    /// format of the Extended Capability
+    pub extended_capability_id: u16,
+    /// Capability Version
+    ///
+    /// This field is a PCI-SIG defined version number that indicates the
+    /// version of the Capability structure present
+    pub capability_version: u8,
+    /// Next Capability Offset
+    ///
+    /// This field contains the offset to the next PCI Express Capability
+    /// structure or 000h if no other items exist in the linked list of Capabilities.
+    pub next_capability_offset: u16,
+}
+
+impl From<u32> for ExtendedCapabilityHeader {
+    fn from(dword: u32) -> Self {
+        let Lsb((
+            extended_capability_id,
+            capability_version,
+            next_capability_offset,
+        )) = P3::<_, 16, 4, 12>(dword).into();
+        Self {
+            extended_capability_id,
+            capability_version,
+            next_capability_offset,
+        }
+    }
+}
+
+struct ExtendedCapabilityHeaderPlaceholder;
+impl FromLeBytes<4> for ExtendedCapabilityHeaderPlaceholder {
+    fn from_le_bytes(_: [u8;4]) -> Self {
+        Self
+    }
+}
+
 type ExtendedCapabilityResult<'a> = Result<ExtendedCapability<'a>, ExtendedCapabilityError>;
 
 fn parse_ecap<'a>(
@@ -249,7 +294,10 @@ fn parse_ecap<'a>(
             .try_into()
             .map(Kind::VirtualChannelMfvcPresent)
             .context(DataSnafu { offset })?,
-        0x000A => Kind::RootComplexRegisterBlockHeader(RootComplexRegisterBlockHeader),
+        0x000A => bytes
+            .try_into()
+            .map(Kind::RootComplexRegisterBlockHeader)
+            .context(DataSnafu { offset })?,
         0x000B => ecap_data
             .try_into()
             .map(Kind::VendorSpecificExtendedCapability)
@@ -553,10 +601,7 @@ pub mod multifunction_virtual_channel;
 pub use multifunction_virtual_channel::MultifunctionVirtualChannel;
 
 // 000Ah Root Complex Register Block (RCRB) Header
-pub mod root_complex_register_block_header {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct RootComplexRegisterBlockHeader;
-}
+pub mod root_complex_register_block_header;
 pub use root_complex_register_block_header::RootComplexRegisterBlockHeader;
 
 // 000Bh Vendor-Specific Extended Capability (VSEC)
