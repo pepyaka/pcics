@@ -19,7 +19,7 @@ Extended Capabilities list:
 - [x] [Virtual Channel (VC)](virtual_channel) (0009h) – used if an MFVC Extended Cap structure is present in the device
 - [x] [Root Complex Register Block (RCRB) Header](root_complex_register_block_header) (000Ah)
 - [x] [Vendor-Specific Extended Capability (VSEC)](vendor_specific_extended_capability) (000Bh)
-- [ ] [Configuration Access Correlation (CAC)](configuration_access_correlation) (000Ch)
+- [x] [Configuration Access Correlation (CAC)](configuration_access_correlation) (000Ch)
 - [x] [Access Control Services (ACS)](access_control_services) (000Dh)
 - [x] [Alternative Routing-ID Interpretation (ARI)](alternative_routing_id_interpolation) (000Eh)
 - [x] [Address Translation Services (ATS)](address_translation_services) (000Fh)
@@ -302,7 +302,10 @@ fn parse_ecap<'a>(
             .try_into()
             .map(Kind::VendorSpecificExtendedCapability)
             .context(DataSnafu { offset })?,
-        0x000C => Kind::ConfigurationAccessCorrelation(ConfigurationAccessCorrelation),
+        0x000C => bytes
+            .try_into()
+            .map(Kind::ConfigurationAccessCorrelation)
+            .context(DataSnafu { offset })?,
         0x000D => ecap_data
             .try_into()
             .map(Kind::AccessControlServices)
@@ -610,10 +613,7 @@ pub use vendor_specific_extended_capability::VendorSpecificExtendedCapability;
 
 // 000Ch Configuration Access Correlation (CAC)
 // defined by the Trusted Configuration Space (TCS) for PCI Express ECN, which is no longer supported
-pub mod configuration_access_correlation {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct ConfigurationAccessCorrelation;
-}
+pub mod configuration_access_correlation;
 pub use configuration_access_correlation::ConfigurationAccessCorrelation;
 
 // 000Dh Access Control Services (ACS)
