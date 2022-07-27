@@ -25,7 +25,7 @@ Extended Capabilities list:
 - [x] [Address Translation Services (ATS)](address_translation_services) (000Fh)
 - [x] [Single Root I/O Virtualization (SR-IOV)](single_root_io_virtualization) (0010h)
 - [ ] [Multi-Root I/O Virtualization (MR-IOV)](multi_root_io_virtualization) (0011h)
-- [ ] [Multicast](multicast) (0012h)
+- [x] [Multicast](multicast) (0012h)
 - [x] [Page Request Interface (PRI)](page_request_interface) (0013h)
 - [ ] [Reserved for AMD](reserved_for_amd) (0014h)
 - [ ] [Resizable BAR](resizable_bar) (0015h)
@@ -139,7 +139,7 @@ pub enum ExtendedCapabilityError {
         source: advanced_error_reporting::AdvancedErrorReportingError,
     },
     #[snafu(display("[{offset:03x}] Downstream Port Containment error: {source}"))]
-    DownstreamPortContainment{
+    DownstreamPortContainment {
         offset: u16,
         source: downstream_port_containment::DownstreamPortContainmentError,
     },
@@ -323,7 +323,10 @@ fn parse_ecap<'a>(
             .map(Kind::SingleRootIoVirtualization)
             .context(DataSnafu { offset })?,
         0x0011 => Kind::MultiRootIoVirtualization(MultiRootIoVirtualization),
-        0x0012 => Kind::Multicast(Multicast),
+        0x0012 => bytes
+            .try_into()
+            .map(Kind::Multicast)
+            .context(DataSnafu { offset })?,
         0x0013 => ecap_data
             .try_into()
             .map(Kind::PageRequestInterface)
@@ -641,10 +644,7 @@ pub mod multi_root_io_virtualization {
 pub use multi_root_io_virtualization::MultiRootIoVirtualization;
 
 // 0012h Multicast
-pub mod multicast {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct Multicast;
-}
+pub mod multicast;
 pub use multicast::Multicast;
 
 // 0013h Page Request Interface (PRI)
@@ -863,9 +863,14 @@ pub use flit_error_injection::FlitErrorInjection;
 
 #[cfg(test)]
 mod tests {
-    use std::prelude::v1::*;
-    use pretty_assertions::assert_eq;
     use super::*;
+    use pretty_assertions::assert_eq;
+    use std::prelude::v1::*;
+
+    const DATA: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/device/8086:2030/config"
+    ));
 
     #[test]
     fn iterator() {
@@ -877,12 +882,7 @@ mod tests {
         // Capabilities: [280] Vendor Specific Information: ID=0005 Rev=3 Len=018 <?>
         // Capabilities: [298] Vendor Specific Information: ID=0007 Rev=0 Len=024 <?>
         // Capabilities: [300] Vendor Specific Information: ID=0008 Rev=0 Len=038 <?>
-        let ecaps = ExtendedCapabilities::new(
-            include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),
-                "/tests/data/device/8086:2030/config"
-            ))
-            [ECS_OFFSET..].try_into().unwrap()
-        );
+        let ecaps = ExtendedCapabilities::new(DATA[ECS_OFFSET..].try_into().unwrap());
         let sample = vec![
             Ok((0x100, 0x000b)),
             Ok((0x110, 0x000d)),
@@ -893,7 +893,9 @@ mod tests {
             Ok((0x298, 0x000b)),
             Ok((0x300, 0x000b)),
         ];
-        let result = ecaps.clone().map(|ecap| ecap.map(|ecap| (ecap.offset, ecap.id())))
+        let result = ecaps
+            .clone()
+            .map(|ecap| ecap.map(|ecap| (ecap.offset, ecap.id())))
             .collect::<Vec<_>>();
         assert_eq!(sample, result);
     }
