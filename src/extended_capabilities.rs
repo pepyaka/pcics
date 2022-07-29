@@ -27,8 +27,8 @@ Extended Capabilities list:
 - [ ] [Multi-Root I/O Virtualization (MR-IOV)](multi_root_io_virtualization) (0011h)
 - [x] [Multicast](multicast) (0012h)
 - [x] [Page Request Interface (PRI)](page_request_interface) (0013h)
-- [ ] [Reserved for AMD](reserved_for_amd) (0014h)
-- [ ] [Resizable BAR](resizable_bar) (0015h)
+- [x] [Reserved for AMD](reserved_for_amd) (0014h)
+- [x] [Resizable BAR](resizable_bar) (0015h)
 - [ ] [Dynamic Power Allocation (DPA)](dynamic_power_allocation) (0016h)
 - [x] [TPH Requester](tph_requester) (0017h)
 - [x] [Latency Tolerance Reporting (LTR)](latency_tolerance_reporting) (0018h)
@@ -143,6 +143,11 @@ pub enum ExtendedCapabilityError {
         offset: u16,
         source: downstream_port_containment::DownstreamPortContainmentError,
     },
+    #[snafu(display("[{offset:03x}] Resizable BAR error: {source}"))]
+    ResizableBar {
+        offset: u16,
+        source: resizable_bar::ResizableBarError,
+    },
 }
 
 
@@ -217,6 +222,11 @@ impl From<u32> for ExtendedCapabilityHeader {
             next_capability_offset,
         }
     }
+}
+
+impl ExtendedCapabilityHeader {
+    /// Extended Capability Header is DWORD
+    pub const SIZE: usize = 4;
 }
 
 struct ExtendedCapabilityHeaderPlaceholder;
@@ -332,7 +342,10 @@ fn parse_ecap<'a>(
             .map(Kind::PageRequestInterface)
             .context(DataSnafu { offset })?,
         0x0014 => Kind::ReservedForAmd(ReservedForAmd),
-        0x0015 => Kind::ResizableBar(ResizableBar),
+        0x0015 => bytes
+            .try_into()
+            .map(Kind::ResizableBar)
+            .context(ResizableBarSnafu { offset })?,
         0x0016 => Kind::DynamicPowerAllocation(DynamicPowerAllocation),
         0x0017 => ecap_data
             .try_into()
@@ -507,7 +520,7 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Reserved for AMD
     ReservedForAmd(ReservedForAmd),
     /// Resizable BAR
-    ResizableBar(ResizableBar),
+    ResizableBar(ResizableBar<'a>),
     /// Dynamic Power Allocation (DPA)
     DynamicPowerAllocation(DynamicPowerAllocation),
     /// TPH Requester
@@ -659,10 +672,7 @@ pub mod reserved_for_amd {
 pub use reserved_for_amd::ReservedForAmd;
 
 // 0015h Resizable BAR
-pub mod resizable_bar {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct ResizableBar;
-}
+pub mod resizable_bar;
 pub use resizable_bar::ResizableBar;
 
 // 0016h Dynamic Power Allocation (DPA)
