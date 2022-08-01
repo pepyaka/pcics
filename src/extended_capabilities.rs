@@ -29,7 +29,7 @@ Extended Capabilities list:
 - [x] [Page Request Interface (PRI)](page_request_interface) (0013h)
 - [x] [Reserved for AMD](reserved_for_amd) (0014h)
 - [x] [Resizable BAR](resizable_bar) (0015h)
-- [ ] [Dynamic Power Allocation (DPA)](dynamic_power_allocation) (0016h)
+- [x] [Dynamic Power Allocation (DPA)](dynamic_power_allocation) (0016h)
 - [x] [TPH Requester](tph_requester) (0017h)
 - [x] [Latency Tolerance Reporting (LTR)](latency_tolerance_reporting) (0018h)
 - [x] [Secondary PCI Express](secondary_pci_express) (0019h)
@@ -147,6 +147,11 @@ pub enum ExtendedCapabilityError {
     ResizableBar {
         offset: u16,
         source: resizable_bar::ResizableBarError,
+    },
+    #[snafu(display("[{offset:03x}] Dynamic Power Allocation error: {source}"))]
+    DynamicPowerAllocation {
+        offset: u16,
+        source: dynamic_power_allocation::DynamicPowerAllocationError,
     },
 }
 
@@ -346,7 +351,10 @@ fn parse_ecap<'a>(
             .try_into()
             .map(Kind::ResizableBar)
             .context(ResizableBarSnafu { offset })?,
-        0x0016 => Kind::DynamicPowerAllocation(DynamicPowerAllocation),
+        0x0016 => bytes
+            .try_into()
+            .map(Kind::DynamicPowerAllocation)
+            .context(DynamicPowerAllocationSnafu { offset })?,
         0x0017 => ecap_data
             .try_into()
             .map(Kind::TphRequester)
@@ -522,7 +530,7 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Resizable BAR
     ResizableBar(ResizableBar<'a>),
     /// Dynamic Power Allocation (DPA)
-    DynamicPowerAllocation(DynamicPowerAllocation),
+    DynamicPowerAllocation(DynamicPowerAllocation<'a>),
     /// TPH Requester
     TphRequester(TphRequester<'a>),
     /// Latency Tolerance Reporting (LTR)
@@ -676,10 +684,7 @@ pub mod resizable_bar;
 pub use resizable_bar::ResizableBar;
 
 // 0016h Dynamic Power Allocation (DPA)
-pub mod dynamic_power_allocation {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct DynamicPowerAllocation;
-}
+pub mod dynamic_power_allocation;
 pub use dynamic_power_allocation::DynamicPowerAllocation;
 
 // 0017h TPH Requester
