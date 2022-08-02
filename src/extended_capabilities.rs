@@ -33,7 +33,7 @@ Extended Capabilities list:
 - [x] [TPH Requester](tph_requester) (0017h)
 - [x] [Latency Tolerance Reporting (LTR)](latency_tolerance_reporting) (0018h)
 - [x] [Secondary PCI Express](secondary_pci_express) (0019h)
-- [ ] [Protocol Multiplexing (PMUX)](protocol_multiplexing) (001Ah)
+- [x] [Protocol Multiplexing (PMUX)](protocol_multiplexing) (001Ah)
 - [x] [Process Address Space ID (PASID)](process_address_space_id) (001Bh)
 - [ ] [LN Requester (LNR)](ln_requester) (001Ch)
 - [x] [Downstream Port Containment (DPC)](downstream_port_containment) (001Dh)
@@ -152,6 +152,11 @@ pub enum ExtendedCapabilityError {
     DynamicPowerAllocation {
         offset: u16,
         source: dynamic_power_allocation::DynamicPowerAllocationError,
+    },
+    #[snafu(display("[{offset:03x}] Protocol Multiplexing error: {source}"))]
+    ProtocolMultiplexing {
+        offset: u16,
+        source: protocol_multiplexing::ProtocolMultiplexingError,
     },
 }
 
@@ -367,7 +372,10 @@ fn parse_ecap<'a>(
             .try_into()
             .map(Kind::SecondaryPciExpress)
             .context(DataSnafu { offset })?,
-        0x001A => Kind::ProtocolMultiplexing(ProtocolMultiplexing),
+        0x001A => bytes
+            .try_into()
+            .map(Kind::ProtocolMultiplexing)
+            .context(ProtocolMultiplexingSnafu { offset })?,
         0x001B => ecap_data
             .try_into()
             .map(Kind::ProcessAddressSpaceId)
@@ -538,7 +546,7 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Secondary PCI Express
     SecondaryPciExpress(SecondaryPciExpress<'a>),
     /// Protocol Multiplexing (PMUX)
-    ProtocolMultiplexing(ProtocolMultiplexing),
+    ProtocolMultiplexing(ProtocolMultiplexing<'a>),
     /// Process Address Space ID (PASID)
     ProcessAddressSpaceId(ProcessAddressSpaceId),
     /// LN Requester (LNR)
@@ -700,10 +708,7 @@ pub mod secondary_pci_express;
 pub use secondary_pci_express::SecondaryPciExpress;
 
 // 001Ah Protocol Multiplexing (PMUX)
-pub mod protocol_multiplexing {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct ProtocolMultiplexing;
-}
+pub mod protocol_multiplexing;
 pub use protocol_multiplexing::ProtocolMultiplexing;
 
 // 001Bh Process Address Space ID (PASID)
