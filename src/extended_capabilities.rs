@@ -35,7 +35,7 @@ Extended Capabilities list:
 - [x] [Secondary PCI Express](secondary_pci_express) (0019h)
 - [x] [Protocol Multiplexing (PMUX)](protocol_multiplexing) (001Ah)
 - [x] [Process Address Space ID (PASID)](process_address_space_id) (001Bh)
-- [ ] [LN Requester (LNR)](ln_requester) (001Ch)
+- [x] [LN Requester (LNR)](ln_requester) (001Ch)
 - [x] [Downstream Port Containment (DPC)](downstream_port_containment) (001Dh)
 - [x] [L1 PM Substates](l1_pm_substates) (001Eh)
 - [x] [Precision Time Measurement (PTM)](precision_time_measurement) (001Fh)
@@ -380,7 +380,10 @@ fn parse_ecap<'a>(
             .try_into()
             .map(Kind::ProcessAddressSpaceId)
             .context(DataSnafu { offset })?,
-        0x001C => Kind::LnRequester(LnRequester),
+        0x001C => bytes
+            .try_into()
+            .map(Kind::LnRequester)
+            .context(DataSnafu { offset })?,
         0x001D => ecap_data
             .try_into()
             .map(Kind::DownstreamPortContainment)
@@ -716,10 +719,7 @@ pub mod process_address_space_id;
 pub use process_address_space_id::ProcessAddressSpaceId;
 
 // 001Ch LN Requester (LNR)
-pub mod ln_requester {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct LnRequester;
-}
+pub mod ln_requester;
 pub use ln_requester::LnRequester;
 
 // 001Dh Downstream Port Containment (DPC)
