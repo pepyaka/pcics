@@ -39,7 +39,7 @@ Extended Capabilities list:
 - [x] [Downstream Port Containment (DPC)](downstream_port_containment) (001Dh)
 - [x] [L1 PM Substates](l1_pm_substates) (001Eh)
 - [x] [Precision Time Measurement (PTM)](precision_time_measurement) (001Fh)
-- [ ] [PCI Express over M-PHY (M-PCIe)](pci_express_over_m_phy) (0020h)
+- [x] [PCI Express over M-PHY (M-PCIe)](pci_express_over_m_phy) (0020h)
 - [ ] [FRS Queueing](frs_queueing) (0021h)
 - [ ] [Readiness Time Reporting](readiness_time_reporting) (0022h)
 - [ ] [Designated Vendor-Specific Extended Capability](designated_vendor_specific_extended_capability) (0023h)
@@ -396,7 +396,10 @@ fn parse_ecap<'a>(
             .try_into()
             .map(Kind::PrecisionTimeMeasurement)
             .context(DataSnafu { offset })?,
-        0x0020 => Kind::PciExpressOverMphy(PciExpressOverMphy),
+        0x0020 => bytes
+            .try_into()
+            .map(Kind::PciExpressOverMphy)
+            .context(DataSnafu { offset })?,
         0x0021 => Kind::FrsQueueing(FrsQueueing),
         0x0022 => Kind::ReadinessTimeReporting(ReadinessTimeReporting),
         0x0023 => Kind::DesignatedVendorSpecificExtendedCapability(
@@ -735,10 +738,7 @@ pub mod precision_time_measurement;
 pub use precision_time_measurement::PrecisionTimeMeasurement;
 
 // 0020h PCI Express over M-PHY (M-PCIe)
-pub mod pci_express_over_m_phy {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct PciExpressOverMphy;
-}
+pub mod pci_express_over_m_phy;
 pub use pci_express_over_m_phy::PciExpressOverMphy;
 
 // 0021h FRS Queueing
