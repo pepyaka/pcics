@@ -40,7 +40,7 @@ Extended Capabilities list:
 - [x] [L1 PM Substates](l1_pm_substates) (001Eh)
 - [x] [Precision Time Measurement (PTM)](precision_time_measurement) (001Fh)
 - [x] [PCI Express over M-PHY (M-PCIe)](pci_express_over_m_phy) (0020h)
-- [ ] [FRS Queueing](frs_queueing) (0021h)
+- [x] [FRS Queuing](frs_queuing) (0021h)
 - [ ] [Readiness Time Reporting](readiness_time_reporting) (0022h)
 - [ ] [Designated Vendor-Specific Extended Capability](designated_vendor_specific_extended_capability) (0023h)
 - [ ] [VF Resizable BAR](vf_resizable_bar) (0024h)
@@ -400,7 +400,10 @@ fn parse_ecap<'a>(
             .try_into()
             .map(Kind::PciExpressOverMphy)
             .context(DataSnafu { offset })?,
-        0x0021 => Kind::FrsQueueing(FrsQueueing),
+        0x0021 => bytes
+            .try_into()
+            .map(Kind::FrsQueuing)
+            .context(DataSnafu { offset })?,
         0x0022 => Kind::ReadinessTimeReporting(ReadinessTimeReporting),
         0x0023 => Kind::DesignatedVendorSpecificExtendedCapability(
             DesignatedVendorSpecificExtendedCapability,
@@ -469,7 +472,7 @@ impl<'a> ExtendedCapability<'a> {
             ExtendedCapabilityKind::L1PmSubstates(_) => 0x001E,
             ExtendedCapabilityKind::PrecisionTimeMeasurement(_) => 0x001F,
             ExtendedCapabilityKind::PciExpressOverMphy(_) => 0x0020,
-            ExtendedCapabilityKind::FrsQueueing(_) => 0x0021,
+            ExtendedCapabilityKind::FrsQueuing(_) => 0x0021,
             ExtendedCapabilityKind::ReadinessTimeReporting(_) => 0x0022,
             ExtendedCapabilityKind::DesignatedVendorSpecificExtendedCapability(_) => 0x0023,
             ExtendedCapabilityKind::VfResizableBar(_) => 0x0024,
@@ -565,8 +568,8 @@ pub enum ExtendedCapabilityKind<'a> {
     PrecisionTimeMeasurement(PrecisionTimeMeasurement),
     /// PCI Express over M-PHY (M-PCIe)
     PciExpressOverMphy(PciExpressOverMphy),
-    /// FRS Queueing
-    FrsQueueing(FrsQueueing),
+    /// FRS Queuing
+    FrsQueuing(FrsQueuing),
     /// Readiness Time Reporting
     ReadinessTimeReporting(ReadinessTimeReporting),
     /// Designated Vendor-Specific Extended Capability
@@ -741,12 +744,9 @@ pub use precision_time_measurement::PrecisionTimeMeasurement;
 pub mod pci_express_over_m_phy;
 pub use pci_express_over_m_phy::PciExpressOverMphy;
 
-// 0021h FRS Queueing
-pub mod frs_queueing {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct FrsQueueing;
-}
-pub use frs_queueing::FrsQueueing;
+// 0021h FRS Queuing
+pub mod frs_queuing;
+pub use frs_queuing::FrsQueuing;
 
 // 0022h Readiness Time Reporting
 pub mod readiness_time_reporting {
