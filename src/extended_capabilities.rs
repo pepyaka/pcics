@@ -41,7 +41,7 @@ Extended Capabilities list:
 - [x] [Precision Time Measurement (PTM)](precision_time_measurement) (001Fh)
 - [x] [PCI Express over M-PHY (M-PCIe)](pci_express_over_m_phy) (0020h)
 - [x] [FRS Queuing](frs_queuing) (0021h)
-- [ ] [Readiness Time Reporting](readiness_time_reporting) (0022h)
+- [x] [Readiness Time Reporting](readiness_time_reporting) (0022h)
 - [ ] [Designated Vendor-Specific Extended Capability](designated_vendor_specific_extended_capability) (0023h)
 - [ ] [VF Resizable BAR](vf_resizable_bar) (0024h)
 - [ ] [Data Link Feature](data_link_feature) (0025h)
@@ -404,7 +404,10 @@ fn parse_ecap<'a>(
             .try_into()
             .map(Kind::FrsQueuing)
             .context(DataSnafu { offset })?,
-        0x0022 => Kind::ReadinessTimeReporting(ReadinessTimeReporting),
+        0x0022 => bytes
+            .try_into()
+            .map(Kind::ReadinessTimeReporting)
+            .context(DataSnafu { offset })?,
         0x0023 => Kind::DesignatedVendorSpecificExtendedCapability(
             DesignatedVendorSpecificExtendedCapability,
         ),
@@ -749,10 +752,7 @@ pub mod frs_queuing;
 pub use frs_queuing::FrsQueuing;
 
 // 0022h Readiness Time Reporting
-pub mod readiness_time_reporting {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct ReadinessTimeReporting;
-}
+pub mod readiness_time_reporting;
 pub use readiness_time_reporting::ReadinessTimeReporting;
 
 // 0023h Designated Vendor-Specific Extended Capability
