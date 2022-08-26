@@ -12,7 +12,7 @@ categories = ["hardware-support", "no-std"]
 edition = "2021"
 
 [dependencies]
-heterob = "0.2.1"
+heterob = "0.3.0"
 snafu = { version = "0.7.1", default-features = false, features = ["rust_1_46"] }
 
 [dev-dependencies]

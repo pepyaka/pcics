@@ -42,7 +42,7 @@ Extended Capabilities list:
 - [x] [PCI Express over M-PHY (M-PCIe)](pci_express_over_m_phy) (0020h)
 - [x] [FRS Queuing](frs_queuing) (0021h)
 - [x] [Readiness Time Reporting](readiness_time_reporting) (0022h)
-- [ ] [Designated Vendor-Specific Extended Capability](designated_vendor_specific_extended_capability) (0023h)
+- [x] [Designated Vendor-Specific Extended Capability](designated_vendor_specific_extended_capability) (0023h)
 - [ ] [VF Resizable BAR](vf_resizable_bar) (0024h)
 - [ ] [Data Link Feature](data_link_feature) (0025h)
 - [ ] [Physical Layer 16.0 GT/s](physical_layer_16_gtps) (0026h)
@@ -157,6 +157,11 @@ pub enum ExtendedCapabilityError {
     ProtocolMultiplexing {
         offset: u16,
         source: protocol_multiplexing::ProtocolMultiplexingError,
+    },
+    #[snafu(display("[{offset:03x}] Designated Vendor-Specific Extended Capabilities error: {source}"))]
+    DesignatedVendorSpecificExtendedCapability {
+        offset: u16,
+        source: designated_vendor_specific_extended_capability::DesignatedVendorSpecificExtendedCapabilityError,
     },
 }
 
@@ -408,9 +413,10 @@ fn parse_ecap<'a>(
             .try_into()
             .map(Kind::ReadinessTimeReporting)
             .context(DataSnafu { offset })?,
-        0x0023 => Kind::DesignatedVendorSpecificExtendedCapability(
-            DesignatedVendorSpecificExtendedCapability,
-        ),
+        0x0023 => bytes
+            .try_into()
+            .map(Kind::DesignatedVendorSpecificExtendedCapability)
+            .context(DesignatedVendorSpecificExtendedCapabilitySnafu { offset })?,
         0x0024 => Kind::VfResizableBar(VfResizableBar),
         0x0025 => Kind::DataLinkFeature(DataLinkFeature),
         0x0026 => Kind::PhysicalLayer16GTps(PhysicalLayer16GTps),
@@ -576,7 +582,7 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Readiness Time Reporting
     ReadinessTimeReporting(ReadinessTimeReporting),
     /// Designated Vendor-Specific Extended Capability
-    DesignatedVendorSpecificExtendedCapability(DesignatedVendorSpecificExtendedCapability),
+    DesignatedVendorSpecificExtendedCapability(DesignatedVendorSpecificExtendedCapability<'a>),
     /// VF Resizable BAR
     VfResizableBar(VfResizableBar),
     /// Data Link Feature
@@ -756,10 +762,7 @@ pub mod readiness_time_reporting;
 pub use readiness_time_reporting::ReadinessTimeReporting;
 
 // 0023h Designated Vendor-Specific Extended Capability
-pub mod designated_vendor_specific_extended_capability {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct DesignatedVendorSpecificExtendedCapability;
-}
+pub mod designated_vendor_specific_extended_capability;
 pub use designated_vendor_specific_extended_capability::DesignatedVendorSpecificExtendedCapability;
 
 // 0024h VF Resizable BAR
