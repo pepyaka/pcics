@@ -43,7 +43,7 @@ Extended Capabilities list:
 - [x] [FRS Queuing](frs_queuing) (0021h)
 - [x] [Readiness Time Reporting](readiness_time_reporting) (0022h)
 - [x] [Designated Vendor-Specific Extended Capability](designated_vendor_specific_extended_capability) (0023h)
-- [ ] [VF Resizable BAR](vf_resizable_bar) (0024h)
+- [x] [VF Resizable BAR](vf_resizable_bar) (0024h)
 - [ ] [Data Link Feature](data_link_feature) (0025h)
 - [ ] [Physical Layer 16.0 GT/s](physical_layer_16_gtps) (0026h)
 - [ ] [Lane Margining at the Receiver](lane_margining_at_the_receiver) (0027h)
@@ -162,6 +162,11 @@ pub enum ExtendedCapabilityError {
     DesignatedVendorSpecificExtendedCapability {
         offset: u16,
         source: designated_vendor_specific_extended_capability::DesignatedVendorSpecificExtendedCapabilityError,
+    },
+    #[snafu(display("[{offset:03x}] VF Resizable BAR error: {source}"))]
+    VfResizableBar {
+        offset: u16,
+        source: vf_resizable_bar::VfResizableBarError,
     },
 }
 
@@ -417,7 +422,10 @@ fn parse_ecap<'a>(
             .try_into()
             .map(Kind::DesignatedVendorSpecificExtendedCapability)
             .context(DesignatedVendorSpecificExtendedCapabilitySnafu { offset })?,
-        0x0024 => Kind::VfResizableBar(VfResizableBar),
+        0x0024 => bytes
+            .try_into()
+            .map(Kind::VfResizableBar)
+            .context(VfResizableBarSnafu { offset })?,
         0x0025 => Kind::DataLinkFeature(DataLinkFeature),
         0x0026 => Kind::PhysicalLayer16GTps(PhysicalLayer16GTps),
         0x0027 => Kind::LaneMarginingAtTheReceiver(LaneMarginingAtTheReceiver),
@@ -584,7 +592,7 @@ pub enum ExtendedCapabilityKind<'a> {
     /// Designated Vendor-Specific Extended Capability
     DesignatedVendorSpecificExtendedCapability(DesignatedVendorSpecificExtendedCapability<'a>),
     /// VF Resizable BAR
-    VfResizableBar(VfResizableBar),
+    VfResizableBar(VfResizableBar<'a>),
     /// Data Link Feature
     DataLinkFeature(DataLinkFeature),
     /// Physical Layer 16.0 GT/s
@@ -767,8 +775,24 @@ pub use designated_vendor_specific_extended_capability::DesignatedVendorSpecific
 
 // 0024h VF Resizable BAR
 pub mod vf_resizable_bar {
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct VfResizableBar;
+    /*!
+    # VF Resizable BAR
+
+    The VF Resizable BAR capability permits hardware to communicate the
+    resource sizes that are acceptable for operation via the VF Resizable BAR Capability and Control
+    registers and system software to communicate the optimal size back to the hardware via the VF
+    BAR Size field of the VF Resizable BAR Control register.
+
+    ## Struct diagram
+
+    VF Resizable BAR has same fields as [ResizableBar](super::ResizableBar)
+    */
+
+    /// VF Resizable BAR
+    pub type VfResizableBar<'a> = super::ResizableBar<'a>;
+
+    /// VF Resizable BAR Error
+    pub type VfResizableBarError = super::resizable_bar::ResizableBarError;
 }
 pub use vf_resizable_bar::VfResizableBar;
 
@@ -917,7 +941,6 @@ mod tests {
             Ok((0x300, 0x000b)),
         ];
         let result = ecaps
-            .clone()
             .map(|ecap| ecap.map(|ecap| (ecap.offset, ecap.id())))
             .collect::<Vec<_>>();
         assert_eq!(sample, result);
