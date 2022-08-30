@@ -221,12 +221,13 @@ impl TryFrom<&[u8]> for DownstreamPortContainment {
 
             let rp_pio_tlp_prefix_log = if dpc_capability.rp_pio_log_size > 5 {
                 let mut rp_pio_tlp_prefix_log = [0u32; 4];
-                for i in 0..((dpc_capability.rp_pio_log_size - 5) as usize).min(4) {
+                let min_rp_pio_log_size = ((dpc_capability.rp_pio_log_size - 5) as usize).min(4);
+                for (i, entry) in rp_pio_tlp_prefix_log.iter_mut().enumerate().take(min_rp_pio_log_size) {
                     let Seq { head, tail } = slice.le_bytes_try_into().map_err(|_| {
                         DownstreamPortContainmentError::RpPioTlpPrefixLog { number: i }
                     })?;
                     slice = tail;
-                    rp_pio_tlp_prefix_log[i] = u32::from_le_bytes(head);
+                    *entry = u32::from_le_bytes(head);
                 }
                 Some(TlpPrefixLog(rp_pio_tlp_prefix_log))
             } else {

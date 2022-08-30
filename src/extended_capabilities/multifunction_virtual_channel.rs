@@ -411,7 +411,7 @@ impl From<VcResourceCapability> for u32 {
         u32::from_le_bytes([
             cap.function_arbitration_capability.into(),
             0,
-            cap.maximum_time_slots.into(),
+            cap.maximum_time_slots,
             cap.function_arbitration_table_offset,
         ])
     }

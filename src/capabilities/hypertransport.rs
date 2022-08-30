@@ -123,7 +123,7 @@ impl<'a> TryFrom<&'a [u8]> for Hypertransport {
                 Self::InterruptDiscoveryAndConfiguration(InterruptDiscoveryAndConfiguration {})
             }
             0b10001 => slice
-                .get(0)
+                .first()
                 .map(|&data| Self::RevisionId(data.into()))
                 .ok_or(HypertransportError::RevisionId)?,
             0b10010 => Self::UnitIdClumping(UnitIdClumping {}),
@@ -222,7 +222,7 @@ impl SlaveOrPrimaryInterface {
         LinkFrequency::new(link_freq_ext, self.link_freq_1)
     }
 }
-impl<'a> From<[u8; Self::SIZE]> for SlaveOrPrimaryInterface {
+impl From<[u8; Self::SIZE]> for SlaveOrPrimaryInterface {
     fn from(bytes: [u8; Self::SIZE]) -> Self {
         let Le((
             command,
@@ -267,14 +267,14 @@ impl<'a> From<[u8; Self::SIZE]> for SlaveOrPrimaryInterface {
             link_control_1: From::<u16>::from(link_control_1),
             link_config_1: From::<u16>::from(link_config_1),
             revision_id: From::<u8>::from(revision_id),
-            link_freq_0: From::<u8>::from(link_freq_0),
+            link_freq_0,
             link_error_0,
             link_freq_cap_0: From::<u16>::from(link_freq_cap_0),
             feature: (feature as u16).into(),
-            link_freq_1: From::<u8>::from(link_freq_1),
+            link_freq_1,
             link_error_1,
             link_freq_cap_1: From::<u16>::from(link_freq_cap_1),
-            enumeration_scratchpad: From::<u16>::from(enumeration_scratchpad),
+            enumeration_scratchpad,
             error_handling: From::<u16>::from(error_handling),
             mem_base_upper,
             mem_limit_upper,
@@ -780,7 +780,7 @@ impl HostOrSecondaryInterface {
         LinkFrequency::new(link_freq_ext, self.link_freq)
     }
 }
-impl<'a> From<[u8; Self::SIZE]> for HostOrSecondaryInterface {
+impl From<[u8; Self::SIZE]> for HostOrSecondaryInterface {
     fn from(bytes: [u8; Self::SIZE]) -> Self {
         let Le((
             command,
@@ -811,11 +811,11 @@ impl<'a> From<[u8; Self::SIZE]> for HostOrSecondaryInterface {
             link_control: From::<u16>::from(link_control),
             link_config: From::<u16>::from(link_config),
             revision_id: From::<u8>::from(revision_id),
-            link_freq: From::<u8>::from(link_freq),
+            link_freq,
             link_error,
             link_freq_cap: From::<u16>::from(link_freq_cap),
             feature: From::<u16>::from(feature),
-            enumeration_scratchpad: From::<u16>::from(enumeration_scratchpad),
+            enumeration_scratchpad,
             error_handling: From::<u16>::from(error_handling),
             mem_base_upper,
             mem_limit_upper,

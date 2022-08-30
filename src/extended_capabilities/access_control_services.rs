@@ -66,7 +66,7 @@ impl<'a> AccessControlServices<'a> {
     pub fn egress_control_vectors(&self) -> EgressControlVectors<'a> {
         let size = self.acs_capability.egress_control_vector_size as usize;
         let end = size / (u32::BITS as usize) * ECV_BYTES;
-        EgressControlVectors::new(&self.data.get(..end).unwrap_or_default(), size)
+        EgressControlVectors::new(self.data.get(..end).unwrap_or_default(), size)
     }
 }
 

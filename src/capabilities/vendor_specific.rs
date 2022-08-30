@@ -73,7 +73,7 @@ pub enum VendorSpecific<'a> {
 impl<'a> VendorSpecific<'a> {
     pub fn try_new(slice: &'a [u8], header: &'a Header) -> Result<Self, VendorSpecificError> {
         let size: usize = slice
-            .get(0)
+            .first()
             .ok_or(VendorSpecificError::LengthUnreadable)
             // slice already without cap_id and next_ptr
             .and_then(|l| {
