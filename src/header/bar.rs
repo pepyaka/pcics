@@ -8,13 +8,16 @@
 use heterob::endianness::LeBytesInto;
 
 
+/// Hold up to six memory addresses used by the device, or offsets for port addresses
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseAddressesNormal(pub [u32; 6]);
+
 impl From<[u8; 6 * 4]> for BaseAddressesNormal {
     fn from(bytes: [u8; 6 * 4]) -> Self {
         Self(bytes.le_bytes_into())
     }
 }
+
 impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesNormal {
     fn from_iter<I: IntoIterator<Item = &'a BaseAddress>>(iter: I) -> Self {
         let mut dwords = [0;6];
@@ -42,13 +45,16 @@ impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesNormal {
     }
 }
 
+/// Bridges hold up to two memory addresses used by the device, or offsets for port addresses
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseAddressesBridge(pub [u32; 2]);
+
 impl From<[u8; 2 * 4]> for BaseAddressesBridge {
     fn from(bytes: [u8; 2 * 4]) -> Self {
         Self(bytes.le_bytes_into())
     }
 }
+
 impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesBridge {
     fn from_iter<I: IntoIterator<Item = &'a BaseAddress>>(iter: I) -> Self {
         let mut dwords = [0;2];
@@ -76,13 +82,16 @@ impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesBridge {
     }
 }
 
+/// Cardbuses may hold up memory addresses used by the device, or offsets for port addresses
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseAddressesCardbus(pub [u32; 1]);
-impl From<[u8; 1 * 4]> for BaseAddressesCardbus {
-    fn from(bytes: [u8; 1 * 4]) -> Self {
+
+impl From<[u8; 4]> for BaseAddressesCardbus {
+    fn from(bytes: [u8; 4]) -> Self {
         Self(bytes.le_bytes_into())
     }
 }
+
 impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesCardbus {
     fn from_iter<I: IntoIterator<Item = &'a BaseAddress>>(iter: I) -> Self {
         let mut dwords = [0;1];
@@ -106,6 +115,7 @@ impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesCardbus {
     }
 }
 
+/// There are three types of BARs
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum BaseAddressesType {
     Normal([u32; 6]),
@@ -113,6 +123,7 @@ enum BaseAddressesType {
     Cardbus([u32;1]),
 }
 
+/// An iterator through [BaseAddress]es
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseAddresses {
     bat: BaseAddressesType,
@@ -196,13 +207,15 @@ impl Iterator for BaseAddresses {
     }
 }
 
-
+/// Base Address Registers (or BARs) can be used to hold memory addresses used
+/// by the device, or offsets for port addresses
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseAddress {
     pub region: usize,
     pub base_address_type: BaseAddressType,
 }
 
+/// Base address possible types
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BaseAddressType {
     /// 32-bit Memory Space mapping

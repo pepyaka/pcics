@@ -65,6 +65,7 @@ impl<const T: char> From<u16> for Status<T> {
     }
 }
 
+/// Specifies allowable timings for assertion of DEVSEL#
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DevselTiming {
     /// fast

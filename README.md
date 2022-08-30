@@ -6,10 +6,13 @@ This library implements decoding PCI configuration space and PCI Express extende
 
 ## Design
 
+The main purpose of this library is to represent configuration space data as a
+hierarchical structures. Therefore, CPU and memory usage may not be optimal.
+
 The library is divided into three parts:
-- PCI 3.0 Compatible Configuration Space Header
-- PCI Configuration Space Capabilities
-- Extended Configuration Space Capabilities
+- [PCI 3.0 Compatible Configuration Space Header](header)
+- [PCI Configuration Space Capabilities](capabilities)
+- [Extended Configuration Space Capabilities](extended_capabilities)
 
 ## Usage
 

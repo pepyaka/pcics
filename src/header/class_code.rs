@@ -1,6 +1,6 @@
 use heterob::{endianness::Le, P3};
 
-
+/// Used to identify the generic operation of the Function and, in some cases, a specific register level programming interface
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ClassCode {
     /// Specific register-level programming interface (if any) so that device independent software

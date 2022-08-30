@@ -7,10 +7,39 @@ is divided into two parts. The first 16 bytes are defined the same for all types
 The remaining bytes can have different layouts depending on the base function that the device
 supports.
 
+## Struct diagram
+<pre>
+<a href="struct.Header.html">Header</a>
+├─ <a href="struct.Command.html">Command</a>
+├─ <a href="struct.Status.html">Status</a>
+│  └─ <a href="enum.DevselTiming.html">DevselTiming</a>
+├─ <a href="struct.ClassCode.html">ClassCode</a>
+├─ <a href="struct.BuiltInSelfTest.html">BuiltInSelfTest</a>
+├─ <a href="enum.HeaderType.html">HeaderType</a>
+│   ├─ <a href="struct.Normal.html">Normal</a>
+│   │  ├─ <a href="struct.BaseAddressesNormal.html">BaseAddressesNormal</a>
+│   │  └─ <a href="struct.ExpansionRom.html">ExpansionRom</a>
+│   ├─ <a href="struct.Bridge.html">Bridge</a>
+│   │  ├─ <a href="struct.BaseAddressesBridge.html">BaseAddressesBridge</a>
+│   │  ├─ <a href="enum.BridgeIoAddressRange.html">BridgeIoAddressRange</a>
+│   │  ├─ <a href="struct.Status.html">Status</a>
+│   │  │  └─ <a href="enum.DevselTiming.html">DevselTiming</a>
+│   │  ├─ <a href="enum.BridgePrefetchableMemory.html">BridgePrefetchableMemory</a>
+│   │  ├─ <a href="struct.ExpansionRom.html">ExpansionRom</a>
+│   │  └─ <a href="struct.BridgeControl.html">BridgeControl</a>
+│   └─ <a href="struct.Cardbus.html">Cardbus</a>
+│      ├─ <a href="struct.BaseAddressesCardbus.html">BaseAddressesCardbus</a>
+│      ├─ <a href="struct.Status.html">Status</a>
+│      │  └─ <a href="enum.DevselTiming.html">DevselTiming</a>
+│      ├─ <a href="enum.IoAccessAddressRange.html">IoAccessAddressRange x 2</a>
+│      └─ <a href="struct.CardbusBridgeControl.html">CardbusBridgeControl</a>
+└─ <a href="enum.InterruptPin.html">InterruptPin</a>
+</pre>
+
 ## Examples
 #### Type 00h Configuration Space Header
 
-lspci out:
+lspci output:
 ```plaintext
 VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] RS880 [Radeon HD 4250] [1002:9715] (prog-if 00 [VGA controller])
         Subsystem: Fujitsu Technology Solutions Device [1734:11da]
@@ -285,7 +314,7 @@ impl From<[u8; Header::TOTAL_SIZE]> for Header {
                         interrupt_line,
                         interrupt_pin,
                         HeaderType::Cardbus(Cardbus {
-                            base_addresses: From::<[u8; 1 * 4]>::from(base_addresses),
+                            base_addresses: From::<[u8; 4]>::from(base_addresses),
                             secondary_status: From::<u16>::from(secondary_status),
                             pci_bus_number,
                             cardbus_bus_number,
@@ -755,7 +784,7 @@ impl From<IoAccessAddressRange > for [[u16;2]; 2] {
     }
 }
 
-
+/// Handle the base address and size information for expansion ROM
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ExpansionRom {
     pub address: u32,
