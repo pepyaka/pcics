@@ -5,158 +5,35 @@
 //! while I/O space BARs can reside at any memory address (even beyond physical memory). To
 //! distinguish between them, you can check the value of the lowest bit.
 
-use heterob::endianness::LeBytesInto;
-
-
-/// Hold up to six memory addresses used by the device, or offsets for port addresses
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BaseAddressesNormal(pub [u32; 6]);
-
-impl From<[u8; 6 * 4]> for BaseAddressesNormal {
-    fn from(bytes: [u8; 6 * 4]) -> Self {
-        Self(bytes.le_bytes_into())
-    }
-}
-
-impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesNormal {
-    fn from_iter<I: IntoIterator<Item = &'a BaseAddress>>(iter: I) -> Self {
-        let mut dwords = [0;6];
-        for ba in iter.into_iter() {
-            let i = ba.region;
-            match ba.base_address_type {
-                BaseAddressType::MemorySpace32 { prefetchable, base_address, } => {
-                    dwords[i] = base_address & !0b1111 | ((prefetchable as u32) << 3);
-                },
-                BaseAddressType::MemorySpaceBelow1M { prefetchable, base_address, } => {
-                    dwords[i] = (base_address as u32) & !0b1111 | 0b010 | ((prefetchable as u32) << 3);
-                },
-                BaseAddressType::MemorySpace64 { prefetchable, base_address, } => {
-                    dwords[i] = (base_address as u32) & !0b1111 | 0b100 | ((prefetchable as u32) << 3);
-                    dwords[i + 1] = (base_address >> 32) as u32;
-                },
-                BaseAddressType::IoSpace { base_address, } => {
-                    dwords[i] = base_address & !0b11 | 0b01;
-                },
-                _ => (),
-            }
-
-        }
-        Self(dwords)
-    }
-}
-
-/// Bridges hold up to two memory addresses used by the device, or offsets for port addresses
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BaseAddressesBridge(pub [u32; 2]);
-
-impl From<[u8; 2 * 4]> for BaseAddressesBridge {
-    fn from(bytes: [u8; 2 * 4]) -> Self {
-        Self(bytes.le_bytes_into())
-    }
-}
-
-impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesBridge {
-    fn from_iter<I: IntoIterator<Item = &'a BaseAddress>>(iter: I) -> Self {
-        let mut dwords = [0;2];
-        for ba in iter.into_iter() {
-            let i = ba.region;
-            match ba.base_address_type {
-                BaseAddressType::MemorySpace32 { prefetchable, base_address, } => {
-                    dwords[i] = base_address & !0b1111 | ((prefetchable as u32) << 3);
-                },
-                BaseAddressType::MemorySpaceBelow1M { prefetchable, base_address, } => {
-                    dwords[i] = (base_address as u32) & !0b1111 | 0b010 | ((prefetchable as u32) << 3);
-                },
-                BaseAddressType::MemorySpace64 { prefetchable, base_address, } => {
-                    dwords[i] = (base_address as u32) & !0b1111 | 0b100 | ((prefetchable as u32) << 3);
-                    dwords[i + 1] = (base_address >> 32) as u32;
-                },
-                BaseAddressType::IoSpace { base_address, } => {
-                    dwords[i] = base_address & !0b11 | 0b01;
-                },
-                _ => (),
-            }
-
-        }
-        Self(dwords)
-    }
-}
-
-/// Cardbuses may hold up memory addresses used by the device, or offsets for port addresses
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BaseAddressesCardbus(pub [u32; 1]);
-
-impl From<[u8; 4]> for BaseAddressesCardbus {
-    fn from(bytes: [u8; 4]) -> Self {
-        Self(bytes.le_bytes_into())
-    }
-}
-
-impl<'a> FromIterator<&'a BaseAddress> for BaseAddressesCardbus {
-    fn from_iter<I: IntoIterator<Item = &'a BaseAddress>>(iter: I) -> Self {
-        let mut dwords = [0;1];
-        for ba in iter.into_iter() {
-            let i = ba.region;
-            match ba.base_address_type {
-                BaseAddressType::MemorySpace32 { prefetchable, base_address, } => {
-                    dwords[i] = base_address & !0b1111 | ((prefetchable as u32) << 3);
-                },
-                BaseAddressType::MemorySpaceBelow1M { prefetchable, base_address, } => {
-                    dwords[i] = (base_address as u32) & !0b1111 | 0b010 | ((prefetchable as u32) << 3);
-                },
-                BaseAddressType::IoSpace { base_address, } => {
-                    dwords[i] = base_address & !0b11 | 0b01;
-                },
-                _ => (),
-            }
-
-        }
-        Self(dwords)
-    }
-}
-
-/// There are three types of BARs
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum BaseAddressesType {
-    Normal([u32; 6]),
-    Bridge([u32; 2]),
-    Cardbus([u32;1]),
-}
 
 /// An iterator through [BaseAddress]es
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BaseAddresses {
-    bat: BaseAddressesType,
+#[derive(Debug, Clone)]
+pub struct BaseAddresses<const N: usize> {
+    data: [u32; N],
     region: usize,
 }
-impl From<BaseAddressesNormal> for BaseAddresses {
-    fn from(ba: BaseAddressesNormal) -> Self {
-        Self { bat: BaseAddressesType::Normal(ba.0), region: 0 }
+
+impl<const N: usize> BaseAddresses<N> {
+    pub fn new(data: [u32; N]) -> Self {
+        Self { data, region: 0 }
+    }
+    /// Return original registers data
+    pub fn orig(&self) -> [u32; N] {
+        self.data
     }
 }
-impl From<BaseAddressesBridge> for BaseAddresses {
-    fn from(ba: BaseAddressesBridge) -> Self {
-        Self { bat: BaseAddressesType::Bridge(ba.0), region: 0 }
-    }
-}
-impl From<BaseAddressesCardbus> for BaseAddresses {
-    fn from(ba: BaseAddressesCardbus) -> Self {
-        Self { bat: BaseAddressesType::Cardbus(ba.0), region: 0 }
-    }
-}
-impl Iterator for BaseAddresses {
+
+impl<const N: usize> Iterator for BaseAddresses<N> {
     type Item = BaseAddress;
     fn next(&mut self) -> Option<Self::Item> {
         let mut next = || -> Option<(usize, u32)> {
             let region = self.region;
-            let dword = match (self.bat.clone(), region) {
-                (BaseAddressesType::Normal(a), 0..=5) => a[region],
-                (BaseAddressesType::Bridge(a), 0..=1) => a[region],
-                (BaseAddressesType::Cardbus(a), 0) => a[region],
-                _ => return None,
-            };
-            self.region += 1;
-            Some((region, dword))
+            if region < N {
+                self.region += 1;
+                Some((region, self.data[region]))
+            } else {
+                None
+            }
         };
         loop {
             let (region, dword) = next()?;
@@ -206,6 +83,48 @@ impl Iterator for BaseAddresses {
         }
     }
 }
+
+impl<const N: usize> FromIterator<BaseAddress> for [u32; N] {
+    fn from_iter<I: IntoIterator<Item = BaseAddress>>(iter: I) -> Self {
+        let mut dwords = [0; N];
+        for ba in iter.into_iter() {
+            let i = ba.region.min(N - 1);
+            match ba.base_address_type {
+                BaseAddressType::MemorySpace32 { prefetchable, base_address, } => {
+                    dwords[i] = base_address & !0b1111 | ((prefetchable as u32) << 3);
+                },
+                BaseAddressType::MemorySpaceBelow1M { prefetchable, base_address, } => {
+                    dwords[i] = (base_address as u32) & !0b1111 | 0b010 | ((prefetchable as u32) << 3);
+                },
+                BaseAddressType::MemorySpace64 { prefetchable, base_address, } => {
+                    dwords[i] = (base_address as u32) & !0b1111 | 0b100 | ((prefetchable as u32) << 3);
+                    dwords[i + 1] = (base_address >> 32) as u32;
+                },
+                BaseAddressType::IoSpace { base_address, } => {
+                    dwords[i] = base_address & !0b11 | 0b01;
+                },
+                _ => (),
+            }
+
+        }
+        dwords
+    }
+}
+
+impl<'a, const N: usize> FromIterator<&'a BaseAddress> for [u32; N] {
+    fn from_iter<I: IntoIterator<Item = &'a BaseAddress>>(iter: I) -> Self {
+        iter.into_iter().cloned().collect()
+    }
+}
+
+impl<const N: usize> PartialEq for BaseAddresses<N> {
+    fn eq(&self, other: &Self) -> bool {
+        self.clone().eq(other.clone())
+    }
+}
+
+impl<const N: usize> Eq for BaseAddresses<N> {}
+
 
 /// Base Address Registers (or BARs) can be used to hold memory addresses used
 /// by the device, or offsets for port addresses
@@ -269,7 +188,7 @@ mod tests {
                 },
             },
         ];
-        let result: BaseAddresses = BaseAddressesNormal([0xb3000000, 0, 0, 0, 0, 0]).into();
+        let result = BaseAddresses::new([0xb3000000, 0, 0, 0, 0, 0]);
         assert_eq!(sample, result.collect::<Vec<_>>());
     }
 
@@ -308,15 +227,15 @@ mod tests {
                 },
             },
         ];
-        let result: BaseAddresses =
-            BaseAddressesNormal([
+        let result =
+            BaseAddresses::new([
                 0xb3000000,
                 0xa000000c,
                 0,
                 0xfff1c004,
                 0x000003bf,
                 0x00003001,
-            ]).into();
+            ]);
         assert_eq!(sample, result.collect::<Vec<_>>());
     }
 
@@ -337,7 +256,7 @@ mod tests {
             0x00, 0xc0, 0xd1, 0x7b
         ];
 
-        let result: BaseAddressesNormal = [
+        let result: [u32; 6] = [
             BaseAddress {
                 region: 0,
                 base_address_type: BaseAddressType::MemorySpace32 {
@@ -377,7 +296,7 @@ mod tests {
         ].iter().collect();
         let dwords: [u32; 6] = bytes.le_bytes_into();
 
-        assert_eq!(BaseAddressesNormal(dwords), result);
+        assert_eq!(BaseAddresses::new(dwords), BaseAddresses::new(result));
     }
 
     #[test]
@@ -385,7 +304,7 @@ mod tests {
         // Region 0: Memory at fce12000 (32-bit, non-prefetchable) [size=4K]
         let bytes = [ 0x00, 0x20, 0xe1, 0xfc, 0x00, 0x00, 0x00, 0x00 ];
 
-        let result: BaseAddressesBridge = [
+        let result: [u32; 2] = [
             BaseAddress {
                 region: 0,
                 base_address_type: BaseAddressType::MemorySpace32 {
@@ -395,6 +314,6 @@ mod tests {
         ].iter().collect();
         let dwords: [u32; 2] = bytes.le_bytes_into();
 
-        assert_eq!(BaseAddressesBridge(dwords), result);
+        assert_eq!(BaseAddresses::new(dwords), BaseAddresses::new(result));
     }
 }

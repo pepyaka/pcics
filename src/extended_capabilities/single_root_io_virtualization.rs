@@ -9,7 +9,7 @@ use core::mem::size_of;
 use snafu::prelude::*;
 use heterob::{P16,P5,P6,P1, endianness::{FromLeBytes, LeBytesInto}, bit_numbering::Lsb};
 
-use crate::header::BaseAddressesNormal;
+use crate::header::BaseAddresses;
 use super::ExtendedCapabilityDataError;
 
 
@@ -47,7 +47,7 @@ pub struct SingleRootIoVirtualization {
     /// VF Device ID (RO)
     pub vf_device_id: u16,
     pub page_sizes: PageSizes,
-    pub base_addresses: BaseAddressesNormal,
+    pub base_addresses: BaseAddresses<6>,
     /// VF Migration State Array Offset (RO)
     pub vf_migration_state_array_offset: u32,
 }
@@ -79,7 +79,7 @@ impl From<[u8; SingleRootIoVirtualization::BYTES]> for SingleRootIoVirtualizatio
                 supported: supported_page_sizes,
                 system: system_page_sizes
             },
-            base_addresses: BaseAddressesNormal(base_addresses.le_bytes_into()),
+            base_addresses: BaseAddresses::new(base_addresses.le_bytes_into()),
             vf_migration_state_array_offset,
         }
     }
@@ -256,7 +256,7 @@ mod tests {
                 supported: 0x00000553,
                 system: 0x00000001,
             },
-            base_addresses: [
+            base_addresses: BaseAddresses::new([
                 BaseAddress {
                     region: 0,
                     base_address_type: BaseAddressType::MemorySpace64 {
@@ -269,7 +269,7 @@ mod tests {
                         prefetchable: true, base_address: 0xa01a0000
                     }, 
                 },
-            ].iter().collect::<BaseAddressesNormal>().into(),
+            ].iter().collect::<[u32; 6]>()),
             vf_migration_state_array_offset: 0,
         };
         

@@ -17,10 +17,14 @@ supports.
 ├─ <a href="struct.BuiltInSelfTest.html">BuiltInSelfTest</a>
 ├─ <a href="enum.HeaderType.html">HeaderType</a>
 │   ├─ <a href="struct.Normal.html">Normal</a>
-│   │  ├─ <a href="struct.BaseAddressesNormal.html">BaseAddressesNormal</a>
+│   │  ├─ <a href="struct.BaseAddresses.html">BaseAddresses<6></a>
+│   │  │  └─ <a href="struct.BaseAddress.html">BaseAddress (0 .. 6)</a>
+│   │  │     └─ <a href="enum.BaseAddressType.html">BaseAddressType</a>
 │   │  └─ <a href="struct.ExpansionRom.html">ExpansionRom</a>
 │   ├─ <a href="struct.Bridge.html">Bridge</a>
-│   │  ├─ <a href="struct.BaseAddressesBridge.html">BaseAddressesBridge</a>
+│   │  ├─ <a href="struct.BaseAddresses.html">BaseAddresses<2></a>
+│   │  │  └─ <a href="struct.BaseAddress.html">BaseAddress (0 .. 2)</a>
+│   │  │     └─ <a href="enum.BaseAddressType.html">BaseAddressType</a>
 │   │  ├─ <a href="enum.BridgeIoAddressRange.html">BridgeIoAddressRange</a>
 │   │  ├─ <a href="struct.Status.html">Status</a>
 │   │  │  └─ <a href="enum.DevselTiming.html">DevselTiming</a>
@@ -28,7 +32,9 @@ supports.
 │   │  ├─ <a href="struct.ExpansionRom.html">ExpansionRom</a>
 │   │  └─ <a href="struct.BridgeControl.html">BridgeControl</a>
 │   └─ <a href="struct.Cardbus.html">Cardbus</a>
-│      ├─ <a href="struct.BaseAddressesCardbus.html">BaseAddressesCardbus</a>
+│      ├─ <a href="struct.BaseAddresses.html">BaseAddresses<1></a>
+│      │  └─ <a href="struct.BaseAddress.html">BaseAddress (0 .. 1)</a>
+│      │     └─ <a href="enum.BaseAddressType.html">BaseAddressType</a>
 │      ├─ <a href="struct.Status.html">Status</a>
 │      │  └─ <a href="enum.DevselTiming.html">DevselTiming</a>
 │      ├─ <a href="enum.IoAccessAddressRange.html">IoAccessAddressRange x 2</a>
@@ -85,7 +91,7 @@ let sample = Header {
     capabilities_pointer: 0x50,
     is_multi_function: true,
     header_type: HeaderType::Normal(Normal {
-        base_addresses: BaseAddressesNormal([
+        base_addresses: BaseAddresses::new([
             0xfc000000 | 0b1000,
             0xe000 | 0b01,
             0xff500000 | 0b0000,
@@ -115,7 +121,7 @@ mod command;
 pub use command::Command;
 
 mod status;
-use heterob::{endianness::Le, P11, P22, P17, Seq, P4, bit_numbering::Lsb, P3};
+use heterob::{endianness::{Le, LeBytesInto}, P11, P22, P17, Seq, P4, bit_numbering::Lsb, P3};
 pub use status::{Status, DevselTiming};
 
 mod class_code;
@@ -125,9 +131,6 @@ mod bar;
 pub use bar::{
     BaseAddress,
     BaseAddressType,
-    BaseAddressesNormal,
-    BaseAddressesBridge,
-    BaseAddressesCardbus,
     BaseAddresses,
 };
 
@@ -212,13 +215,13 @@ impl From<[u8; Header::TOTAL_SIZE]> for Header {
                         min_grant,
                         max_latency,
                     )) = P11(tail).into();
-                    let _: [u8; 7] = _reserved;
+                    let _: ([u8; 6 * 4], [u8; 7]) = (base_addresses, _reserved);
                     (
                         capabilities_pointer,
                         interrupt_line,
                         interrupt_pin,
                         HeaderType::Normal(Normal {
-                            base_addresses: From::<[u8; 6 * 4]>::from(base_addresses),
+                            base_addresses: BaseAddresses::new(base_addresses.le_bytes_into()),
                             cardbus_cis_pointer,
                             sub_vendor_id,
                             sub_device_id,
@@ -253,13 +256,13 @@ impl From<[u8; Header::TOTAL_SIZE]> for Header {
                         interrupt_pin,
                         bridge_control,
                     )) = P22(tail).into();
-                    let _: [u8; 3] = _reserved;
+                    let _: ([u8; 2 * 4], [u8; 3]) = (base_addresses, _reserved);
                     (
                         capabilities_pointer,
                         interrupt_line,
                         interrupt_pin,
                         HeaderType::Bridge(Bridge {
-                            base_addresses: From::<[u8; 2 * 4]>::from(base_addresses),
+                            base_addresses: BaseAddresses::new(base_addresses.le_bytes_into()),
                             primary_bus_number,
                             secondary_bus_number,
                             subordinate_bus_number,
@@ -304,7 +307,7 @@ impl From<[u8; Header::TOTAL_SIZE]> for Header {
                         interrupt_pin,
                         bridge_control,
                     )) = P17(tail).into();
-                    let _: u8 = _reserved;
+                    let _: ([u8; 4], u8) = (base_addresses, _reserved);
                     let Le(io_access_address_range_0) =
                         From::<[u8; 8]>::from(io_access_address_range_0);
                     let Le(io_access_address_range_1) =
@@ -314,7 +317,7 @@ impl From<[u8; Header::TOTAL_SIZE]> for Header {
                         interrupt_line,
                         interrupt_pin,
                         HeaderType::Cardbus(Cardbus {
-                            base_addresses: From::<[u8; 4]>::from(base_addresses),
+                            base_addresses: BaseAddresses::new(base_addresses.le_bytes_into()),
                             secondary_status: From::<u16>::from(secondary_status),
                             pci_bus_number,
                             cardbus_bus_number,
@@ -385,17 +388,6 @@ pub enum HeaderType {
     Reserved(u8),
 }
 impl HeaderType {
-    pub fn base_addresses(&self) -> Option<bar::BaseAddresses> {
-        match self {
-            Self::Normal(Normal { base_addresses, .. }) =>
-                Some(base_addresses.clone().into()),
-            Self::Bridge(Bridge { base_addresses, .. }) =>
-                Some(base_addresses.clone().into()),
-            Self::Cardbus(Cardbus { base_addresses, .. }) =>
-                Some(base_addresses.clone().into()),
-            Self::Reserved(_) => None,
-        }
-    }
     pub fn expansion_rom(&self) -> Option<ExpansionRom> {
        match &self {
            Self::Normal(Normal { expansion_rom, .. }) => Some(expansion_rom.clone()),
@@ -425,7 +417,7 @@ impl<'a> From<&'a HeaderType> for u8 {
 /// General device (Type 00h)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Normal {
-    pub base_addresses: BaseAddressesNormal,
+    pub base_addresses: BaseAddresses<6>,
     /// Points to the Card Information Structure and is used by devices that share silicon between CardBus and PCI.
     pub cardbus_cis_pointer: u32,
     /// Subsystem Vendor ID
@@ -446,7 +438,7 @@ pub struct Normal {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bridge {
     /// Base Address Registers
-    pub base_addresses: BaseAddressesBridge,
+    pub base_addresses: BaseAddresses<2>,
     /// Primary Bus Number
     pub primary_bus_number: u8,
     /// Secondary Bus Number
@@ -583,7 +575,7 @@ impl BridgePrefetchableMemory {
 /// PCI-to-CardBus bridge (Type 02h)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cardbus {
-    pub base_addresses: BaseAddressesCardbus,
+    pub base_addresses: BaseAddresses<1>,
     /// Secondary status
     pub secondary_status: Status<'C'>,
     /// PCI Bus Number
@@ -903,7 +895,7 @@ mod tests {
             capabilities_pointer: 0x80,
             is_multi_function: false,
             header_type: HeaderType::Normal(Normal {
-                base_addresses: BaseAddressesNormal([
+                base_addresses: BaseAddresses::new([
                     0x93014000,
                     0x93017000,
                     0x3041,
@@ -1000,7 +992,7 @@ mod tests {
             },
             is_multi_function: false,
             header_type: HeaderType::Bridge(Bridge {
-                base_addresses: BaseAddressesBridge([0; 2]),
+                base_addresses: BaseAddresses::new([0; 2]),
                 primary_bus_number: 0x04,
                 secondary_bus_number: 0x05,
                 subordinate_bus_number: 0x08,
@@ -1077,7 +1069,7 @@ mod tests {
             capabilities_pointer: 0x80,
             is_multi_function: true,
             header_type: HeaderType::Cardbus(Cardbus {
-                base_addresses: BaseAddressesCardbus([0x35f88000]),
+                base_addresses: BaseAddresses::new([0x35f88000]),
                 secondary_status: 0x0000.into(),
                 pci_bus_number: 0x6d,
                 cardbus_bus_number: 0xba,
