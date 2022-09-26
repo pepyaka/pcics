@@ -17,37 +17,36 @@ The library is divided into three parts:
 ## Usage
 
 ```rust
-use pcics::{
-    DDR_OFFSET, ECS_OFFSET, Header, Capabilities, ExtendedCapabilities,
-    capabilities::{
-        Capability,
-        CapabilityKind,
-        bridge_subsystem_vendor_id::BridgeSubsystemVendorId
-    },
-    extended_capabilities::{
-        ExtendedCapability,
-        ExtendedCapabilityKind,
-        vendor_specific_extended_capability::VendorSpecificExtendedCapability
-    },
-};
+# use pcics::{
+#     DDR_OFFSET, ECS_OFFSET,
+#     capabilities::{
+#         bridge_subsystem_vendor_id::BridgeSubsystemVendorId, Capability, CapabilityKind,
+#     },
+#     extended_capabilities::{
+#         vendor_specific_extended_capability::VendorSpecificExtendedCapability,
+#         ExtendedCapability, ExtendedCapabilityKind,
+#     },
+#     Capabilities, ExtendedCapabilities, Header,
+# };
+let conf_space_data = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/data/device/8086:2030/config"
+));
 
-let conf_space =
-    include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/data/device/8086:2030/config"
-    ));
-
-let header_data = &conf_space[..DDR_OFFSET];
-let header = Header::try_from(header_data).unwrap();
+let header = Header::try_from(&conf_space_data[..DDR_OFFSET]).unwrap();
 assert_eq!((0x8086, 0x2030), (header.vendor_id, header.device_id));
 
-let device_depended_region_data = &conf_space[DDR_OFFSET..ECS_OFFSET];
-let mut caps = Capabilities::new(device_depended_region_data, &header);
-let BridgeSubsystemVendorId { subsystem_vendor_id, .. } =
-    caps.find_map(|cap| {
-        if let Ok(
-            Capability { kind: CapabilityKind::BridgeSubsystemVendorId(ssvid), .. }
-        ) = cap {
+let mut caps = Capabilities::new(&conf_space_data[DDR_OFFSET..ECS_OFFSET], &header);
+let BridgeSubsystemVendorId {
+    subsystem_vendor_id,
+    ..
+} = caps
+    .find_map(|cap| {
+        if let Ok(Capability {
+            kind: CapabilityKind::BridgeSubsystemVendorId(ssvid),
+            ..
+        }) = cap
+        {
             Some(ssvid)
         } else {
             None
@@ -56,16 +55,14 @@ let BridgeSubsystemVendorId { subsystem_vendor_id, .. } =
     .unwrap();
 assert_eq!(0x8086, subsystem_vendor_id);
 
-let ecs_data = &conf_space[ECS_OFFSET..];
-let mut ecaps = ExtendedCapabilities::new(ecs_data);
+let mut ecaps = ExtendedCapabilities::new(&conf_space_data[ECS_OFFSET..]);
 let VendorSpecificExtendedCapability { header, .. } = ecaps
     .find_map(|ecap| {
-        if let Ok(
-            ExtendedCapability {
-                kind: ExtendedCapabilityKind::VendorSpecificExtendedCapability(vsec),
-                ..
-            }
-        ) = ecap {
+        if let Ok(ExtendedCapability {
+            kind: ExtendedCapabilityKind::VendorSpecificExtendedCapability(vsec),
+            ..
+        }) = ecap
+        {
             Some(vsec)
         } else {
             None

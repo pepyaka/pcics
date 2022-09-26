@@ -799,9 +799,16 @@ impl From<u32> for ExpansionRom {
         }
     }
 }
+
 impl From<ExpansionRom> for u32 {
     fn from(rom: ExpansionRom) -> Self {
         rom.address | (rom.reserved as u32) << 1 | (rom.is_enabled as u32)
+    }
+}
+
+impl From<ExpansionRom> for u64 {
+    fn from(rom: ExpansionRom) -> Self {
+        u32::from(rom) as u64
     }
 }
 
