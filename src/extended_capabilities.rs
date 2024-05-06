@@ -916,7 +916,7 @@ mod tests {
 
     const DATA: &[u8] = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/tests/data/device/8086:2030/config"
+        "/tests/data/device/8086_2030/config"
     ));
 
     #[test]
