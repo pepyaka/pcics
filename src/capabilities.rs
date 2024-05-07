@@ -521,7 +521,7 @@ mod tests {
         //         Address: 00000000fee00578  Data: 0000
         let data = include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/tests/data/device/8086:9dc8/config"
+            "/tests/data/device/8086_9dc8/config"
         ));
         let header = data.as_slice().try_into().unwrap();
         let ddr = &data[DDR_OFFSET..ECS_OFFSET];

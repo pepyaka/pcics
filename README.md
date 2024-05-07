@@ -30,7 +30,7 @@ The library is divided into three parts:
 # };
 let conf_space_data = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/tests/data/device/8086:2030/config"
+    "/tests/data/device/8086_2030/config"
 ));
 
 let header = Header::try_from(&conf_space_data[..DDR_OFFSET]).unwrap();
